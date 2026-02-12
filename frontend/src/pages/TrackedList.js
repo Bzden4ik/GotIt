@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import './TrackedList.css';
 
 function TrackedList() {
-  const [trackedStreamers, setTrackedStreamers] = useState([]);
-  const [selectedStreamer, setSelectedStreamer] = useState(null);
+  const [trackedStreamers] = useState([]);
+  // const [selectedStreamer, setSelectedStreamer] = useState(null);
 
   return (
     <div className="tracked-list">
@@ -27,7 +27,7 @@ function TrackedList() {
                 <div className="card-actions">
                   <button 
                     className="view-btn"
-                    onClick={() => setSelectedStreamer(streamer)}
+                    onClick={() => console.log('Открыть вишлист:', streamer)}
                   >
                     Вишлист
                   </button>

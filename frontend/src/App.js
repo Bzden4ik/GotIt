@@ -5,7 +5,7 @@ import TrackedList from './pages/TrackedList';
 import './App.css';
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user] = useState(null);
 
   return (
     <Router basename="/GotIt">
