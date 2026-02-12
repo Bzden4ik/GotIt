@@ -1,0 +1,78 @@
+.streamer-card-component {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.streamer-card-component .avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.streamer-card-component .info {
+  flex: 1;
+}
+
+.streamer-card-component h3 {
+  margin-bottom: 0.25rem;
+  color: #333;
+  font-size: 1rem;
+}
+
+.streamer-card-component .username {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.streamer-card-component .description {
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.streamer-card-component .actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.streamer-card-component .btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.streamer-card-component .btn.track {
+  background-color: #4caf50;
+  color: white;
+}
+
+.streamer-card-component .btn.track:hover {
+  background-color: #45a049;
+}
+
+.streamer-card-component .btn.view {
+  background-color: #0088cc;
+  color: white;
+}
+
+.streamer-card-component .btn.view:hover {
+  background-color: #006699;
+}
+
+.streamer-card-component .btn.remove {
+  background-color: #f44336;
+  color: white;
+}
+
+.streamer-card-component .btn.remove:hover {
+  background-color: #d32f2f;
+}

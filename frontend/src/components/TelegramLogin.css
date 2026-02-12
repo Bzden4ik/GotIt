@@ -1,0 +1,11 @@
+.telegram-login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+#telegram-login-container {
+  display: flex;
+  justify-content: center;
+}
