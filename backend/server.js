@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const fettaParser = require('./parsers/fettaParser');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,19 +27,26 @@ app.get('/api/streamer/search', async (req, res) => {
   }
 
   try {
-    // TODO: Реализовать парсинг fetta.app
+    console.log(`Поиск стримера: ${nickname}`);
+    const result = await fettaParser.getStreamerInfo(nickname);
+    
+    if (!result.success) {
+      return res.status(404).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+    
     res.json({
       success: true,
-      streamer: {
-        nickname: nickname,
-        username: `@${nickname}`,
-        avatar: 'https://via.placeholder.com/80',
-        description: 'Описание стримера',
-        fettaUrl: `https://fetta.app/u/${nickname}`
-      }
+      streamer: result.profile
     });
   } catch (error) {
-    res.status(500).json({ error: 'Ошибка при поиске стримера' });
+    console.error('Ошибка при поиске стримера:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при поиске стримера' 
+    });
   }
 });
 
@@ -47,13 +55,26 @@ app.get('/api/streamer/:nickname/wishlist', async (req, res) => {
   const { nickname } = req.params;
 
   try {
-    // TODO: Реализовать парсинг вишлиста
+    console.log(`Получение вишлиста для: ${nickname}`);
+    const result = await fettaParser.getStreamerInfo(nickname);
+    
+    if (!result.success) {
+      return res.status(404).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+    
     res.json({
       success: true,
-      items: []
+      items: result.wishlist
     });
   } catch (error) {
-    res.status(500).json({ error: 'Ошибка при получении вишлиста' });
+    console.error('Ошибка при получении вишлиста:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Ошибка при получении вишлиста' 
+    });
   }
 });
 

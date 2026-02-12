@@ -1,29 +1,41 @@
 import React, { useState } from 'react';
+import apiService from '../services/api';
 import './SearchPage.css';
 
 function SearchPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
     setLoading(true);
-    // TODO: Подключить API
-    setTimeout(() => {
-      setSearchResults([
-        {
-          id: 1,
-          nickname: 'Fitchu_chan',
-          username: '@fitchu_chan',
-          avatar: 'https://via.placeholder.com/80',
-          description: 'Стример и контент-мейкер'
-        }
-      ]);
+    setError(null);
+    
+    try {
+      const response = await apiService.searchStreamer(searchQuery.trim());
+      
+      if (response.success && response.streamer) {
+        setSearchResults([response.streamer]);
+      } else {
+        setError('Стример не найден');
+        setSearchResults([]);
+      }
+    } catch (err) {
+      setError(err.message || 'Ошибка при поиске стримера');
+      setSearchResults([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+
+  const handleTrack = (streamer) => {
+    // TODO: Добавить в отслеживаемые
+    console.log('Отслеживать:', streamer);
+    alert(`Стример ${streamer.nickname} добавлен в отслеживаемые (функция в разработке)`);
   };
 
   return (
@@ -44,17 +56,55 @@ function SearchPage() {
           </button>
         </form>
 
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
         {searchResults.length > 0 && (
           <div className="search-results">
-            {searchResults.map((streamer) => (
-              <div key={streamer.id} className="streamer-card">
-                <img src={streamer.avatar} alt={streamer.nickname} className="streamer-avatar" />
+            {searchResults.map((streamer, index) => (
+              <div key={index} className="streamer-card">
+                {streamer.avatar && (
+                  <img 
+                    src={streamer.avatar} 
+                    alt={streamer.nickname} 
+                    className="streamer-avatar"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/80';
+                    }}
+                  />
+                )}
                 <div className="streamer-info">
-                  <h3>{streamer.nickname}</h3>
+                  <h3>{streamer.name || streamer.nickname}</h3>
                   <p className="username">{streamer.username}</p>
-                  <p className="description">{streamer.description}</p>
+                  {streamer.description && (
+                    <p className="description">{streamer.description}</p>
+                  )}
+                  {streamer.socialLinks && streamer.socialLinks.length > 0 && (
+                    <div className="social-links">
+                      {streamer.socialLinks.map((link, idx) => (
+                        <a 
+                          key={idx} 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="social-link"
+                          title={link.platform}
+                        >
+                          {link.platform}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button className="track-btn">Отслеживать</button>
+                <button 
+                  className="track-btn"
+                  onClick={() => handleTrack(streamer)}
+                >
+                  Отслеживать
+                </button>
               </div>
             ))}
           </div>
