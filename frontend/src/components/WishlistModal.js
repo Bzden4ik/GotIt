@@ -8,22 +8,22 @@ function WishlistModal({ streamer, onClose }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadWishlist();
-  }, [streamer]);
-
-  const loadWishlist = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getWishlist(streamer.id);
-      if (response.success) {
-        setItems(response.items);
+    const loadWishlist = async () => {
+      try {
+        setLoading(true);
+        const response = await apiService.getWishlist(streamer.id);
+        if (response.success) {
+          setItems(response.items);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadWishlist();
+  }, [streamer.id]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
