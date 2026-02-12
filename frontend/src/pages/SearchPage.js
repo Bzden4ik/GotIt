@@ -32,10 +32,16 @@ function SearchPage() {
     }
   };
 
-  const handleTrack = (streamer) => {
-    // TODO: Добавить в отслеживаемые
-    console.log('Отслеживать:', streamer);
-    alert(`Стример ${streamer.nickname} добавлен в отслеживаемые (функция в разработке)`);
+  const handleTrack = async (streamer) => {
+    try {
+      setLoading(true);
+      await apiService.addTrackedStreamer(streamer.nickname);
+      alert(`Стример ${streamer.nickname} добавлен в отслеживаемые!`);
+    } catch (err) {
+      alert(err.message || 'Ошибка при добавлении стримера');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

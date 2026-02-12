@@ -20,9 +20,9 @@ class ApiService {
   /**
    * Получить вишлист стримера
    */
-  async getWishlist(nickname) {
+  async getWishlist(streamerId) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/streamer/${nickname}/wishlist`);
+      const response = await axios.get(`${API_BASE_URL}/streamer/${streamerId}/wishlist`);
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -32,10 +32,10 @@ class ApiService {
   /**
    * Добавить стримера в отслеживаемые
    */
-  async addTrackedStreamer(streamerId) {
+  async addTrackedStreamer(nickname) {
     try {
       const response = await axios.post(`${API_BASE_URL}/tracked`, {
-        streamerId
+        nickname
       });
       return response.data;
     } catch (error) {
