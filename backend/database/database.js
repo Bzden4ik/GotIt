@@ -1,9 +1,17 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 class DatabaseService {
   constructor() {
     const dbPath = process.env.DATABASE_URL || path.join(__dirname, '../data/gotit.db');
+    
+    // Создаём директорию, если её нет
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+    
     this.db = new Database(dbPath);
     this.init();
   }
