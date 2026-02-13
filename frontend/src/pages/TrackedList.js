@@ -60,7 +60,7 @@ function TrackedList({ user }) {
   if (!user) {
     return (
       <div className="tracked-list">
-        <div className="container">
+        <div className="container bvl">
           <h2>⭐ Отслеживаемые стримеры</h2>
           <div className="empty-state">
             <p>Войдите через Telegram, чтобы отслеживать стримеров</p>
@@ -73,7 +73,7 @@ function TrackedList({ user }) {
   if (loading) {
     return (
       <div className="tracked-list">
-        <div className="container">
+        <div className="container bvl">
           <h2>⭐ Отслеживаемые стримеры</h2>
           <div className="loading">Загрузка...</div>
         </div>
@@ -84,7 +84,7 @@ function TrackedList({ user }) {
   if (error) {
     return (
       <div className="tracked-list">
-        <div className="container">
+        <div className="container bvl">
           <h2>⭐ Отслеживаемые стримеры</h2>
           <div className="error-message">{error}</div>
         </div>
