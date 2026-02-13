@@ -1,134 +1,109 @@
-.tracked-list {
-  max-width: 1200px;
-  margin: 0 auto;
-}
+.tracked-list { max-width: 1060px; margin: 0 auto; width: 100%; }
 
-.tracked-list h2 {
-  font-size: 48px;
-  font-weight: 600;
-  margin-bottom: 32px;
-  background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.03em;
-  animation: fadeIn 0.8s ease;
+.tracked-list .page-title {
+  font-size: clamp(32px, 5.5vw, 52px);
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  color: var(--white);
+  margin-bottom: 44px;
 }
 
 .loading, .empty-state {
   text-align: center;
-  padding: 80px 20px;
-  animation: fadeIn 0.6s ease;
+  padding: 72px 20px;
+  animation: fadeUp 0.5s var(--ease);
 }
+.loading { font-size: 14px; color: var(--dim); }
+.empty-state p { font-size: 15px; color: var(--dim); margin-bottom: 4px; }
+.hint { font-size: 12px; color: var(--ghost); }
 
-.loading {
-  font-size: 18px;
-  color: var(--color-text-secondary);
-}
-
-.empty-state p {
-  font-size: 18px;
-  color: var(--color-text-secondary);
-  margin-bottom: 8px;
-}
-
-.hint {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  opacity: 0.6;
-}
-
-/* Streamers Grid */
+/* ── Grid ── */
 .streamers-grid {
-  display: flex !important;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
-  animation: fadeIn 0.8s ease;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  animation: fadeUp 0.6s var(--ease) 0.2s both;
 }
 
+/* ── Card ── */
 .streamer-card {
-  background: var(--color-bg-card);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  transition: all 0.3s ease;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  transition: all 0.3s var(--ease);
 }
-
 .streamer-card:hover {
-  border-color: rgba(139, 92, 246, 0.3);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  border-color: var(--line-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 0 28px rgba(34,211,238,0.06);
 }
 
 .streamer-avatar {
-  width: 80px;
-  height: 80px;
+  width: 64px; height: 64px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 8px;
+  border: 2px solid var(--line);
 }
 
-.streamer-info h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 4px;
-}
-
-.username {
-  font-size: 13px;
-  color: var(--color-accent);
-  margin-bottom: 8px;
-}
+.streamer-info h3 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.username { font-size: 12px; color: var(--cyan); margin-bottom: 6px; }
 
 .items-count {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-sm);
   display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
 }
 
 .card-actions {
   display: flex;
   gap: 8px;
+  width: 100%;
   margin-top: auto;
+  padding-top: 4px;
 }
 
 .view-btn, .remove-btn {
   flex: 1;
-  padding: 10px;
+  padding: 9px 0;
   border: none;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  border-radius: var(--r);
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.25s var(--ease);
 }
 
 .view-btn {
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--cyan);
+  color: var(--black);
 }
-
 .view-btn:hover {
-  transform: scale(1.02);
-  box-shadow: var(--shadow-glow);
+  filter: brightness(1.1);
+  box-shadow: 0 0 18px var(--cyan-glow);
 }
 
 .remove-btn {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--color-text-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+}
+.remove-btn:hover {
+  color: var(--rose);
+  border-color: rgba(251,113,133,0.2);
+  background: rgba(251,113,133,0.04);
 }
 
-.remove-btn:hover {
-  background: rgba(245, 87, 108, 0.2);
-  border-color: rgba(245, 87, 108, 0.5);
-  color: #f5576c;
+@media (max-width: 600px) {
+  .streamers-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .streamer-card { padding: 16px; }
 }

@@ -3,6 +3,7 @@ import apiService from '../services/api';
 import WishlistModal from '../components/WishlistModal';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
+import TextDecode from '../components/TextDecode';
 import './TrackedList.css';
 
 function TrackedList({ user }) {
@@ -61,7 +62,7 @@ function TrackedList({ user }) {
     return (
       <div className="tracked-list">
         <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
+          <TextDecode text="Отслеживаемые" as="h2" className="page-title" delay={200} duration={1000} />
           <div className="empty-state">
             <p>Войдите через Telegram, чтобы отслеживать стримеров</p>
           </div>
@@ -74,7 +75,7 @@ function TrackedList({ user }) {
     return (
       <div className="tracked-list">
         <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
+          <TextDecode text="Отслеживаемые" as="h2" className="page-title" delay={200} duration={1000} />
           <div className="loading">Загрузка...</div>
         </div>
       </div>
@@ -85,7 +86,7 @@ function TrackedList({ user }) {
     return (
       <div className="tracked-list">
         <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
+          <TextDecode text="Отслеживаемые" as="h2" className="page-title" delay={200} duration={1000} />
           <div className="error-message">{error}</div>
         </div>
       </div>
@@ -95,7 +96,7 @@ function TrackedList({ user }) {
   return (
     <div className="tracked-list">
       <div className="container bvl">
-        <h2>⭐ Отслеживаемые стримеры</h2>
+        <TextDecode text="Отслеживаемые" as="h2" className="page-title" delay={200} duration={1000} />
         
         {trackedStreamers.length === 0 ? (
           <div className="empty-state">

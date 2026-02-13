@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
+import TextDecode from '../components/TextDecode';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -82,7 +83,8 @@ function SearchPage({ user }) {
   return (
     <div className="search-page">
       <div className="container bvl">
-        <h2>🔍 Найти стримера</h2>
+        <TextDecode text="Найти стримера" as="h2" className="page-title" delay={200} duration={1000} />
+        <p className="page-subtitle">Введите никнейм, чтобы увидеть вишлист</p>
         
         <form onSubmit={handleSearch} className="search-form">
           <input

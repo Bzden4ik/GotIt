@@ -3,10 +3,18 @@ import './BackgroundGradient.css';
 
 function BackgroundGradient() {
   return (
-    <div className="bg-gradient-wrapper">
-      <div className="bg-gradient bg-gradient-1"></div>
-      <div className="bg-gradient bg-gradient-2"></div>
-      <div className="bg-gradient bg-gradient-3"></div>
+    <div className="bg-scene">
+      {/* Ribbon streams */}
+      <div className="bg-ribbon bg-ribbon--1" />
+      <div className="bg-ribbon bg-ribbon--2" />
+      <div className="bg-ribbon bg-ribbon--3" />
+
+      {/* Ambient orbs */}
+      <div className="bg-orb bg-orb--1" />
+      <div className="bg-orb bg-orb--2" />
+
+      {/* Noise overlay */}
+      <div className="bg-noise" />
     </div>
   );
 }
