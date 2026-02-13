@@ -151,6 +151,7 @@ function TrackedList({ user }) {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {selectedStreamer && (
