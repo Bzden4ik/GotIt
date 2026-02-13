@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
+import DecodeText from '../components/DecodeText';
+import PageTransition from '../components/PageTransition';
+import useStaggerAnimation from '../hooks/useStaggerAnimation';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -11,6 +14,8 @@ function SearchPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  
+  const resultsRef = useStaggerAnimation('.streamer-card', 0.2);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -80,11 +85,14 @@ function SearchPage({ user }) {
   };
 
   return (
-    <div className="search-page">
-      <div className="container bvl">
-        <h2>🔍 Найти стримера</h2>
+    <PageTransition>
+      <div className="search-page">
+        <div className="container bvl">
+          <h2>
+            <DecodeText text="🔍 Найти стримера" />
+          </h2>
         
-        <form onSubmit={handleSearch} className="search-form">
+          <form onSubmit={handleSearch} className="search-form">
           <input
             type="text"
             placeholder="Введите ник стримера..."
@@ -104,7 +112,7 @@ function SearchPage({ user }) {
         )}
 
         {searchResults.length > 0 && (
-          <div className="search-results">
+          <div className="search-results" ref={resultsRef}>
             {searchResults.map((streamer, index) => (
               <div key={index} className="streamer-card">
                 {streamer.avatar && (
@@ -159,7 +167,7 @@ function SearchPage({ user }) {
           onClose={() => setToast(null)}
         />
       )}
-    </div>
+    </PageTransition>
   );
 }
 

@@ -3,6 +3,9 @@ import apiService from '../services/api';
 import WishlistModal from '../components/WishlistModal';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
+import DecodeText from '../components/DecodeText';
+import PageTransition from '../components/PageTransition';
+import useStaggerAnimation from '../hooks/useStaggerAnimation';
 import './TrackedList.css';
 
 function TrackedList({ user }) {
@@ -12,6 +15,8 @@ function TrackedList({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  
+  const gridRef = useStaggerAnimation('.streamer-card', 0.3);
 
   useEffect(() => {
     if (user) {
@@ -59,43 +64,50 @@ function TrackedList({ user }) {
 
   if (!user) {
     return (
-      <div className="tracked-list">
-        <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
-          <div className="empty-state">
-            <p>Войдите через Telegram, чтобы отслеживать стримеров</p>
+      <PageTransition>
+        <div className="tracked-list">
+          <div className="container bvl">
+            <h2><DecodeText text="⭐ Отслеживаемые стримеры" /></h2>
+            <div className="empty-state">
+              <p>Войдите через Telegram, чтобы отслеживать стримеров</p>
+            </div>
           </div>
         </div>
-      </div>
+      </PageTransition>
     );
   }
 
   if (loading) {
     return (
-      <div className="tracked-list">
-        <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
-          <div className="loading">Загрузка...</div>
+      <PageTransition>
+        <div className="tracked-list">
+          <div className="container bvl">
+            <h2><DecodeText text="⭐ Отслеживаемые стримеры" /></h2>
+            <div className="loading">Загрузка...</div>
+          </div>
         </div>
-      </div>
+      </PageTransition>
     );
   }
 
   if (error) {
     return (
-      <div className="tracked-list">
-        <div className="container bvl">
-          <h2>⭐ Отслеживаемые стримеры</h2>
+      <PageTransition>
+        <div className="tracked-list">
+          <div className="container bvl">
+            <h2><DecodeText text="⭐ Отслеживаемые стримеры" /></h2>
           <div className="error-message">{error}</div>
         </div>
       </div>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="tracked-list">
-      <div className="container bvl">
-        <h2>⭐ Отслеживаемые стримеры</h2>
+    <PageTransition>
+      <div className="tracked-list">
+        <div className="container bvl">
+          <h2><DecodeText text="⭐ Отслеживаемые стримеры" /></h2>
         
         {trackedStreamers.length === 0 ? (
           <div className="empty-state">
@@ -103,7 +115,7 @@ function TrackedList({ user }) {
             <p className="hint">Найдите стримера в разделе "Поиск" и добавьте его в отслеживаемые</p>
           </div>
         ) : (
-          <div className="streamers-grid">
+          <div className="streamers-grid" ref={gridRef}>
             {trackedStreamers.map((streamer) => (
               <div key={streamer.id} className="streamer-card">
                 {streamer.avatar && (
@@ -164,7 +176,7 @@ function TrackedList({ user }) {
           onClose={() => setToast(null)}
         />
       )}
-    </div>
+    </PageTransition>
   );
 }
 

@@ -1,0 +1,3 @@
+.page-transition-container {
+  will-change: opacity, transform;
+}

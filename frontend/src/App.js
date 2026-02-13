@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import TrackedList from './pages/TrackedList';
 import BackgroundGradient from './components/BackgroundGradient';
+import DecodeText from './components/DecodeText';
 import apiService from './services/api';
 import './App.css';
 
@@ -102,7 +103,9 @@ function App() {
       <div className="app">
         <header className="header">
           <div className="container">
-            <h1 className="logo" href="https://bzden4ik.github.io/GotIt">GotIt</h1>
+            <h1 className="logo" href="https://bzden4ik.github.io/GotIt">
+              <DecodeText text="GotIt" delay={0.2} />
+            </h1>
             <nav className="nav">
               <Link to="/" className="nav-link">Поиск</Link>
               <Link to="/tracked" className="nav-link">Отслеживаю</Link>

@@ -1,0 +1,8 @@
+.decode-text {
+  display: inline-block;
+}
+
+.decode-char {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
