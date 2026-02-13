@@ -166,6 +166,7 @@ function SearchPage({ user }) {
             onClose={() => setToast(null)}
           />
         )}
+        </div>
       </div>
     </PageTransition>
   );
