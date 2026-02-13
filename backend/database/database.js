@@ -12,8 +12,12 @@ class DatabaseService {
       fs.mkdirSync(dbDir, { recursive: true });
     }
     
+    console.log(`📂 База данных: ${dbPath}`);
+    
     this.db = new Database(dbPath);
     this.init();
+    
+    console.log(`✅ База данных инициализирована`);
   }
 
   init() {
@@ -93,6 +97,11 @@ class DatabaseService {
     return stmt.get(telegramId);
   }
 
+  getUserById(userId) {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE id = ?');
+    return stmt.get(userId);
+  }
+
   // Стримеры
   createOrUpdateStreamer(streamerData) {
     const { nickname, name, username, avatar, description, fettaUrl } = streamerData;
@@ -125,6 +134,22 @@ class DatabaseService {
 
   // Отслеживание стримеров
   addTrackedStreamer(userId, streamerId) {
+    // Проверяем существование пользователя
+    const userStmt = this.db.prepare('SELECT id FROM users WHERE id = ?');
+    const user = userStmt.get(userId);
+    
+    if (!user) {
+      throw new Error(`Пользователь с ID ${userId} не найден в базе данных`);
+    }
+    
+    // Проверяем существование стримера
+    const streamerStmt = this.db.prepare('SELECT id FROM streamers WHERE id = ?');
+    const streamer = streamerStmt.get(streamerId);
+    
+    if (!streamer) {
+      throw new Error(`Стример с ID ${streamerId} не найден в базе данных`);
+    }
+    
     const stmt = this.db.prepare(`
       INSERT OR IGNORE INTO user_streamers (user_id, streamer_id)
       VALUES (?, ?)

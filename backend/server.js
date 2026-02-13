@@ -90,6 +90,40 @@ app.post('/api/auth/telegram', (req, res) => {
   }
 });
 
+// Проверка пользователя (для восстановления после перезагрузки)
+app.get('/api/auth/check', (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'userId не указан' });
+  }
+
+  try {
+    const user = db.getUserById(parseInt(userId));
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Пользователь не найден',
+        needReauth: true
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        telegramId: user.telegram_id,
+        username: user.username,
+        firstName: user.first_name
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка проверки пользователя:', error);
+    res.status(500).json({ success: false, error: 'Ошибка проверки' });
+  }
+});
+
 // Эндпоинт для поиска стримера
 app.get('/api/streamer/search', async (req, res) => {
   const { nickname } = req.query;
@@ -177,9 +211,19 @@ app.post('/api/tracked', async (req, res) => {
     });
   } catch (error) {
     console.error('Ошибка при добавлении стримера:', error);
+    
+    // Проверяем тип ошибки
+    if (error.message && error.message.includes('не найден в базе данных')) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Сессия устарела. Пожалуйста, войдите заново через Telegram',
+        needReauth: true
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
-      error: 'Ошибка при добавлении стримера' 
+      error: error.message || 'Ошибка при добавлении стримера' 
     });
   }
 });
@@ -271,15 +315,82 @@ app.get('/api/streamer/:id/wishlist', async (req, res) => {
   }
 });
 
+// === Тестовые эндпоинты ===
+// Проверка бота
+app.get('/api/test/bot', async (req, res) => {
+  if (!BOT_TOKEN) {
+    return res.status(500).json({ success: false, error: 'TELEGRAM_BOT_TOKEN не настроен' });
+  }
+
+  const TelegramBot = require('./bot/telegramBot');
+  const bot = new TelegramBot(BOT_TOKEN);
+
+  try {
+    const botInfo = await bot.getMe();
+    res.json({
+      success: true,
+      bot: {
+        username: botInfo.result.username,
+        name: botInfo.result.first_name
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Запуск разовой проверки вишлистов
+app.get('/api/test/scheduler', async (req, res) => {
+  try {
+    const Scheduler = require('./scheduler');
+    const scheduler = new Scheduler(BOT_TOKEN);
+    
+    // Запускаем проверку в фоне
+    scheduler.checkAllStreamers().catch(err => {
+      console.error('Ошибка проверки:', err);
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Проверка запущена. Смотрите логи сервера.' 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Отправка тестового уведомления
+app.post('/api/test/notify', async (req, res) => {
+  const { telegramId } = req.body;
+  
+  if (!telegramId) {
+    return res.status(400).json({ success: false, error: 'Укажите telegramId' });
+  }
+
+  if (!BOT_TOKEN) {
+    return res.status(500).json({ success: false, error: 'TELEGRAM_BOT_TOKEN не настроен' });
+  }
+
+  const TelegramBot = require('./bot/telegramBot');
+  const bot = new TelegramBot(BOT_TOKEN);
+
+  try {
+    await bot.sendMessage(telegramId, '✅ Тестовое уведомление от GotIt!');
+    res.json({ success: true, message: 'Уведомление отправлено' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Запуск сервера
+let scheduler;
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
   
   // Запускаем планировщик проверки вишлистов
-  const scheduler = new Scheduler(BOT_TOKEN);
+  scheduler = new Scheduler(BOT_TOKEN);
   
   // По умолчанию: каждые 30 минут
-  // Можно настроить через переменную окружения CHECK_INTERVAL
   const checkInterval = process.env.CHECK_INTERVAL || '*/30 * * * *';
   scheduler.start(checkInterval);
   

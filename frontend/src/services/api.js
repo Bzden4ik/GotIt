@@ -24,6 +24,20 @@ class ApiService {
   }
 
   /**
+   * Проверка пользователя
+   */
+  async checkUser(userId) {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/auth/check`, {
+        params: { userId }
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Поиск стримера
    */
   async searchStreamer(nickname) {

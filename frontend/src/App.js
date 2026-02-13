@@ -13,17 +13,36 @@ function App() {
 
   // Восстановление сессии из localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('gotit_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setUser(parsed);
-        apiService.setUserId(parsed.id);
-      } catch (e) {
-        localStorage.removeItem('gotit_user');
+    const checkSession = async () => {
+      const saved = localStorage.getItem('gotit_user');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          
+          // Проверяем существование пользователя в БД
+          try {
+            const response = await apiService.checkUser(parsed.id);
+            if (response.success && response.user) {
+              setUser(response.user);
+              apiService.setUserId(response.user.id);
+            } else {
+              // Пользователь не найден в БД - требуется переавторизация
+              localStorage.removeItem('gotit_user');
+              console.log('Требуется переавторизация');
+            }
+          } catch (err) {
+            // Ошибка проверки - очищаем данные
+            localStorage.removeItem('gotit_user');
+            console.error('Ошибка проверки пользователя:', err);
+          }
+        } catch (e) {
+          localStorage.removeItem('gotit_user');
+        }
       }
-    }
-    setAuthLoading(false);
+      setAuthLoading(false);
+    };
+    
+    checkSession();
   }, []);
 
   // Обработка авторизации через Telegram Login Widget

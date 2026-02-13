@@ -42,7 +42,16 @@ function SearchPage({ user }) {
       await apiService.addTrackedStreamer(streamer.nickname);
       alert(`Стример ${streamer.nickname} добавлен в отслеживаемые!`);
     } catch (err) {
-      alert(err.message || 'Ошибка при добавлении стримера');
+      const errorMsg = err.message || 'Ошибка при добавлении стримера';
+      
+      // Проверяем нужна ли переавторизация
+      if (errorMsg.includes('Сессия устарела') || errorMsg.includes('войдите заново')) {
+        alert('Ваша сессия устарела. Пожалуйста, выйдите и войдите заново через Telegram');
+        // Можно автоматически разлогинить
+        // window.location.reload();
+      } else {
+        alert(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
