@@ -11,14 +11,23 @@ class FettaParser {
    * Извлечь UID из HTML страницы (Next.js RSC/SSR)
    */
   extractUidFromHtml(html) {
-    // Стратегия 1: прямой JSON-ключ userId
-    const patterns = [
-      /"userId"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/,
-      /"wishlistOwnerId"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/,
-      /"ownerId"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/,
-      /"uid"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/,
-      /"id"\s*:\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/,
+    const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+    // Стратегия 1: RSC payload (экранированные кавычки \\" в Next.js script-тегах)
+    const escapedPatterns = [
+      new RegExp(`\\\\"wishlistOwnerId\\\\":\\\\"(${UUID})\\\\"`, 'i'),
+      new RegExp(`\\\\"userId\\\\":\\\\"(${UUID})\\\\"`, 'i'),
+      new RegExp(`\\\\"targetUserId\\\\":\\\\"(${UUID})\\\\"`, 'i'),
+      new RegExp(`\\\\"ownerId\\\\":\\\\"(${UUID})\\\\"`, 'i'),
     ];
+    // Стратегия 2: обычный JSON
+    const normalPatterns = [
+      new RegExp(`"wishlistOwnerId"\\s*:\\s*"(${UUID})"`, 'i'),
+      new RegExp(`"userId"\\s*:\\s*"(${UUID})"`, 'i'),
+      new RegExp(`"targetUserId"\\s*:\\s*"(${UUID})"`, 'i'),
+      new RegExp(`"ownerId"\\s*:\\s*"(${UUID})"`, 'i'),
+      new RegExp(`"uid"\\s*:\\s*"(${UUID})"`, 'i'),
+    ];
+    const patterns = [...escapedPatterns, ...normalPatterns];
 
     for (const pattern of patterns) {
       const match = html.match(pattern);
