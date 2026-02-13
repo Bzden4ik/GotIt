@@ -60,7 +60,7 @@ function SearchPage({ user }) {
   return (
     <div className="search-page">
       <div className="container">
-        <h2>Поиск стримера</h2>
+        <h2>🔍 Найти стримера</h2>
         
         <form onSubmit={handleSearch} className="search-form">
           <input

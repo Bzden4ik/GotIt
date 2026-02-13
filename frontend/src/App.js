@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import TrackedList from './pages/TrackedList';
+import BackgroundGradient from './components/BackgroundGradient';
 import apiService from './services/api';
 import './App.css';
 
@@ -97,6 +98,7 @@ function App() {
 
   return (
     <Router basename="/GotIt">
+      <BackgroundGradient />
       <div className="app">
         <header className="header">
           <div className="container">
