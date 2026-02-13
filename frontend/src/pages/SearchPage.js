@@ -4,7 +4,6 @@ import apiService from '../services/api';
 import Toast from '../components/Toast';
 import DecodeText from '../components/DecodeText';
 import PageTransition from '../components/PageTransition';
-import useStaggerAnimation from '../hooks/useStaggerAnimation';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -14,8 +13,6 @@ function SearchPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
-  
-  const resultsRef = useStaggerAnimation('.streamer-card', 0.2);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -93,79 +90,79 @@ function SearchPage({ user }) {
           </h2>
         
           <form onSubmit={handleSearch} className="search-form">
-          <input
-            type="text"
-            placeholder="Введите ник стримера..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-          <button type="submit" className="search-btn" disabled={loading}>
-            {loading ? 'Поиск...' : 'Найти'}
-          </button>
-        </form>
+            <input
+              type="text"
+              placeholder="Введите ник стримера..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            <button type="submit" className="search-btn" disabled={loading}>
+              {loading ? 'Поиск...' : 'Найти'}
+            </button>
+          </form>
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
 
-        {searchResults.length > 0 && (
-          <div className="search-results" ref={resultsRef}>
-            {searchResults.map((streamer, index) => (
-              <div key={index} className="streamer-card">
-                {streamer.avatar && (
-                  <img 
-                    src={streamer.avatar} 
-                    alt={streamer.nickname} 
-                    className="streamer-avatar"
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/80';
-                    }}
-                  />
-                )}
-                <div className="streamer-info">
-                  <h3>{streamer.name || streamer.nickname}</h3>
-                  <p className="username">{streamer.username}</p>
-                  {streamer.description && (
-                    <p className="description">{streamer.description}</p>
+          {searchResults.length > 0 && (
+            <div className="search-results">
+              {searchResults.map((streamer, index) => (
+                <div key={index} className="streamer-card">
+                  {streamer.avatar && (
+                    <img 
+                      src={streamer.avatar} 
+                      alt={streamer.nickname} 
+                      className="streamer-avatar"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/80';
+                      }}
+                    />
                   )}
-                  {streamer.socialLinks && streamer.socialLinks.length > 0 && (
-                    <div className="social-links">
-                      {streamer.socialLinks.map((link, idx) => (
-                        <a 
-                          key={idx} 
-                          href={link.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="social-link"
-                          title={link.platform}
-                        >
-                          {link.platform}
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  <div className="streamer-info">
+                    <h3>{streamer.name || streamer.nickname}</h3>
+                    <p className="username">{streamer.username}</p>
+                    {streamer.description && (
+                      <p className="description">{streamer.description}</p>
+                    )}
+                    {streamer.socialLinks && streamer.socialLinks.length > 0 && (
+                      <div className="social-links">
+                        {streamer.socialLinks.map((link, idx) => (
+                          <a 
+                            key={idx} 
+                            href={link.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="social-link"
+                            title={link.platform}
+                          >
+                            {link.platform}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
+                    onClick={() => handleTrack(streamer)}
+                  >
+                    {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
+                  </button>
                 </div>
-                <button 
-                  className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
-                  onClick={() => handleTrack(streamer)}
-                >
-                  {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
         
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
+          {toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )}
         </div>
       </div>
     </PageTransition>

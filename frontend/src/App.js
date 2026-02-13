@@ -104,7 +104,7 @@ function App() {
         <header className="header">
           <div className="container">
             <h1 className="logo" href="https://bzden4ik.github.io/GotIt">
-              <DecodeText text="GotIt" delay={0.2} />
+              <DecodeText text="GotIt" />
             </h1>
             <nav className="nav">
               <Link to="/" className="nav-link">Поиск</Link>
