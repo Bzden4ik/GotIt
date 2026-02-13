@@ -110,6 +110,10 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: all 0.3s ease;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  cursor: pointer;
 }
 
 .wishlist-item:hover {
@@ -150,21 +154,41 @@
   overflow: hidden;
 }
 
+.item-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .item-link {
   display: inline-block;
-  padding: 8px 16px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  color: var(--color-accent);
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
-.item-link:hover {
+.item-link-fetta {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--color-accent);
+}
+
+.item-link-fetta:hover {
   background: rgba(139, 92, 246, 0.2);
+}
+
+.item-link-marketplace {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.item-link-marketplace:hover {
+  background: rgba(16, 185, 129, 0.25);
   transform: scale(1.05);
 }
 
