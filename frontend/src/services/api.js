@@ -3,6 +3,26 @@ import axios from 'axios';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 class ApiService {
+  constructor() {
+    this.userId = null;
+  }
+
+  setUserId(userId) {
+    this.userId = userId;
+  }
+
+  /**
+   * Авторизация через Telegram
+   */
+  async authTelegram(telegramData) {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/telegram`, telegramData);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   /**
    * Поиск стримера
    */
@@ -35,7 +55,8 @@ class ApiService {
   async addTrackedStreamer(nickname) {
     try {
       const response = await axios.post(`${API_BASE_URL}/tracked`, {
-        nickname
+        nickname,
+        userId: this.userId
       });
       return response.data;
     } catch (error) {
@@ -48,7 +69,9 @@ class ApiService {
    */
   async getTrackedStreamers() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/tracked`);
+      const response = await axios.get(`${API_BASE_URL}/tracked`, {
+        params: { userId: this.userId }
+      });
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -60,7 +83,9 @@ class ApiService {
    */
   async removeTrackedStreamer(streamerId) {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/tracked/${streamerId}`);
+      const response = await axios.delete(`${API_BASE_URL}/tracked/${streamerId}`, {
+        params: { userId: this.userId }
+      });
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -72,13 +97,10 @@ class ApiService {
    */
   handleError(error) {
     if (error.response) {
-      // Ошибка от сервера
       return new Error(error.response.data.error || 'Ошибка сервера');
     } else if (error.request) {
-      // Запрос был отправлен, но ответа не было
       return new Error('Не удалось связаться с сервером');
     } else {
-      // Ошибка при настройке запроса
       return new Error('Ошибка при выполнении запроса');
     }
   }

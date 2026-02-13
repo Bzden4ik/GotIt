@@ -3,15 +3,19 @@ import apiService from '../services/api';
 import WishlistModal from '../components/WishlistModal';
 import './TrackedList.css';
 
-function TrackedList() {
+function TrackedList({ user }) {
   const [trackedStreamers, setTrackedStreamers] = useState([]);
   const [selectedStreamer, setSelectedStreamer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadTrackedStreamers();
-  }, []);
+    if (user) {
+      loadTrackedStreamers();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadTrackedStreamers = async () => {
     try {
@@ -41,6 +45,19 @@ function TrackedList() {
   const handleViewWishlist = (streamer) => {
     setSelectedStreamer(streamer);
   };
+
+  if (!user) {
+    return (
+      <div className="tracked-list">
+        <div className="container">
+          <h2>Отслеживаемые стримеры</h2>
+          <div className="empty-state">
+            <p>Войдите через Telegram, чтобы отслеживать стримеров</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

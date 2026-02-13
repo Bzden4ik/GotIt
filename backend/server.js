@@ -1,15 +1,45 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 require('dotenv').config();
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Проверка подписи Telegram Login Widget
+function verifyTelegramAuth(data) {
+  if (!BOT_TOKEN) {
+    console.warn('TELEGRAM_BOT_TOKEN не задан, проверка подписи пропущена');
+    return true;
+  }
+
+  const { hash, ...rest } = data;
+  if (!hash) return false;
+
+  // Собираем строку для проверки: все поля (кроме hash) отсортированные, через \n
+  const checkString = Object.keys(rest)
+    .sort()
+    .map(key => `${key}=${rest[key]}`)
+    .join('\n');
+
+  const secretKey = crypto.createHash('sha256').update(BOT_TOKEN).digest();
+  const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
+
+  if (hmac !== hash) return false;
+
+  // Проверяем что авторизация не устарела (не старше 24ч)
+  const authDate = parseInt(data.auth_date, 10);
+  if (Date.now() / 1000 - authDate > 86400) return false;
+
+  return true;
+}
 
 // Тестовый эндпоинт
 app.get('/api/test', (req, res) => {
@@ -17,6 +47,46 @@ app.get('/api/test', (req, res) => {
     message: 'Backend работает!', 
     timestamp: new Date().toISOString() 
   });
+});
+
+// === Авторизация через Telegram ===
+app.post('/api/auth/telegram', (req, res) => {
+  const telegramData = req.body;
+
+  if (!telegramData || !telegramData.id) {
+    return res.status(400).json({ success: false, error: 'Нет данных Telegram' });
+  }
+
+  // Проверяем подпись
+  if (!verifyTelegramAuth(telegramData)) {
+    return res.status(401).json({ success: false, error: 'Неверная подпись Telegram' });
+  }
+
+  try {
+    // Создаём или находим пользователя
+    db.createUser(
+      telegramData.id,
+      telegramData.username || '',
+      telegramData.first_name || ''
+    );
+
+    const user = db.getUserByTelegramId(telegramData.id);
+
+    console.log(`Авторизован пользователь: ${user.username} (telegram_id: ${user.telegram_id})`);
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        telegramId: user.telegram_id,
+        username: user.username,
+        firstName: user.first_name
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка авторизации:', error);
+    res.status(500).json({ success: false, error: 'Ошибка авторизации' });
+  }
 });
 
 // Эндпоинт для поиска стримера
@@ -53,10 +123,13 @@ app.get('/api/streamer/search', async (req, res) => {
 
 // Добавить стримера в отслеживаемые
 app.post('/api/tracked', async (req, res) => {
-  const { nickname, userId = 1 } = req.body; // TODO: реальный userId из Telegram
+  const { nickname, userId } = req.body;
   
   if (!nickname) {
     return res.status(400).json({ error: 'Необходимо указать nickname' });
+  }
+  if (!userId) {
+    return res.status(401).json({ error: 'Необходимо авторизоваться' });
   }
 
   try {
@@ -112,7 +185,11 @@ app.post('/api/tracked', async (req, res) => {
 
 // Получить список отслеживаемых стримеров
 app.get('/api/tracked', async (req, res) => {
-  const { userId = 1 } = req.query; // TODO: реальный userId из Telegram
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Необходимо авторизоваться' });
+  }
 
   try {
     const streamers = db.getTrackedStreamers(userId);
@@ -142,7 +219,11 @@ app.get('/api/tracked', async (req, res) => {
 // Удалить стримера из отслеживаемых
 app.delete('/api/tracked/:streamerId', async (req, res) => {
   const { streamerId } = req.params;
-  const { userId = 1 } = req.query; // TODO: реальный userId из Telegram
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Необходимо авторизоваться' });
+  }
 
   try {
     db.removeTrackedStreamer(userId, parseInt(streamerId));

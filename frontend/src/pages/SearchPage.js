@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import apiService from '../services/api';
 import './SearchPage.css';
 
-function SearchPage() {
+function SearchPage({ user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +33,10 @@ function SearchPage() {
   };
 
   const handleTrack = async (streamer) => {
+    if (!user) {
+      alert('Для отслеживания стримеров необходимо войти через Telegram');
+      return;
+    }
     try {
       setLoading(true);
       await apiService.addTrackedStreamer(streamer.nickname);

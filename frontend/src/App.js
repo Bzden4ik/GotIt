@@ -1,11 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import SearchPage from './pages/SearchPage';
 import TrackedList from './pages/TrackedList';
+import apiService from './services/api';
 import './App.css';
 
+const BOT_USERNAME = process.env.REACT_APP_TELEGRAM_BOT_USERNAME || '';
+
 function App() {
-  const [user] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Восстановление сессии из localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('gotit_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setUser(parsed);
+        apiService.setUserId(parsed.id);
+      } catch (e) {
+        localStorage.removeItem('gotit_user');
+      }
+    }
+    setAuthLoading(false);
+  }, []);
+
+  // Обработка авторизации через Telegram Login Widget
+  const handleTelegramAuth = useCallback(async (telegramUser) => {
+    try {
+      const response = await apiService.authTelegram(telegramUser);
+      if (response.success && response.user) {
+        setUser(response.user);
+        apiService.setUserId(response.user.id);
+        localStorage.setItem('gotit_user', JSON.stringify(response.user));
+      }
+    } catch (err) {
+      console.error('Ошибка авторизации:', err);
+      alert('Ошибка авторизации через Telegram');
+    }
+  }, []);
+
+  // Глобальный callback для Telegram Widget
+  useEffect(() => {
+    window.onTelegramAuth = handleTelegramAuth;
+    return () => { window.onTelegramAuth = null; };
+  }, [handleTelegramAuth]);
+
+  const handleLogout = () => {
+    setUser(null);
+    apiService.setUserId(null);
+    localStorage.removeItem('gotit_user');
+  };
+
+  // Telegram Login Widget — вставляем скрипт
+  const TelegramWidget = () => {
+    const ref = React.useRef(null);
+
+    useEffect(() => {
+      if (!BOT_USERNAME || !ref.current) return;
+      ref.current.innerHTML = '';
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-widget.js?22';
+      script.setAttribute('data-telegram-login', BOT_USERNAME);
+      script.setAttribute('data-size', 'medium');
+      script.setAttribute('data-radius', '8');
+      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      script.setAttribute('data-request-access', 'write');
+      script.async = true;
+      ref.current.appendChild(script);
+    }, []);
+
+    return <div ref={ref} />;
+  };
+
+  if (authLoading) return null;
 
   return (
     <Router basename="/GotIt">
@@ -19,9 +88,14 @@ function App() {
             </nav>
             <div className="user-section">
               {user ? (
-                <span className="user-info">@{user.username}</span>
+                <div className="user-logged">
+                  <span className="user-info">
+                    {user.username ? `@${user.username}` : user.firstName}
+                  </span>
+                  <button className="logout-btn" onClick={handleLogout}>Выйти</button>
+                </div>
               ) : (
-                <button className="login-btn">Войти через Telegram</button>
+                <TelegramWidget />
               )}
             </div>
           </div>
@@ -29,8 +103,8 @@ function App() {
 
         <main className="main">
           <Routes>
-            <Route path="/" element={<SearchPage />} />
-            <Route path="/tracked" element={<TrackedList />} />
+            <Route path="/" element={<SearchPage user={user} />} />
+            <Route path="/tracked" element={<TrackedList user={user} />} />
           </Routes>
         </main>
       </div>
