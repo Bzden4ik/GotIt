@@ -2,7 +2,10 @@
   display: inline-block;
 }
 
+.decode-text.animating {
+  opacity: 0.7;
+}
+
 .decode-char {
   display: inline-block;
-  will-change: transform, opacity, filter;
 }

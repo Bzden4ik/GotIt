@@ -25,6 +25,23 @@ function WishlistModal({ streamer, onClose }) {
     loadWishlist();
   }, [streamer.id]);
 
+  // Определить площадку по URL
+  const getPlatformName = (url) => {
+    if (!url) return 'товар';
+    if (url.includes('ozon.ru')) return 'Ozon';
+    if (url.includes('wildberries.ru')) return 'Wildberries';
+    if (url.includes('market.yandex.ru')) return 'Яндекс.Маркет';
+    if (url.includes('aliexpress')) return 'AliExpress';
+    return 'магазин';
+  };
+
+  // Создать ссылку на товар в Fetta (открывает модалку с товаром)
+  const getFettaItemUrl = (item) => {
+    // Fetta открывает товары через прямую ссылку на страницу товара
+    // Формат: https://fetta.app/u/nickname (товар откроется в модалке при клике)
+    return streamer.fetta_url || `https://fetta.app/u/${streamer.nickname}`;
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -65,6 +82,7 @@ function WishlistModal({ streamer, onClose }) {
                       src={item.image} 
                       alt={item.name || 'Product'} 
                       className="item-image"
+                      loading="lazy"
                       onError={(e) => {
                         e.target.src = 'https://via.placeholder.com/200';
                       }}
@@ -77,16 +95,28 @@ function WishlistModal({ streamer, onClose }) {
                     {item.name && (
                       <div className="item-name">{item.name}</div>
                     )}
-                    {item.product_url && (
-                      <a 
-                        href={item.product_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="item-link"
-                      >
-                        Смотреть товар
-                      </a>
-                    )}
+                    <div className="item-actions">
+                      {item.product_url && (
+                        <a 
+                          href={getFettaItemUrl(item)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="item-link item-link-fetta"
+                        >
+                          Смотреть на Fetta
+                        </a>
+                      )}
+                      {item.product_url && (
+                        <a 
+                          href={item.product_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="item-link item-link-store"
+                        >
+                          {getPlatformName(item.product_url)}
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
