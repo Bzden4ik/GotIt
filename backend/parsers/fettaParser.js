@@ -1,114 +1,119 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const puppeteer = require('puppeteer');
 
 class FettaParser {
   constructor() {
     this.baseUrl = 'https://fetta.app';
-    this.browser = null;
-  }
-
-  async getBrowser() {
-    if (!this.browser) {
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
-    }
-    return this.browser;
+    this.apiUrl = 'https://fetta.app/api';
   }
 
   /**
-   * Получить страницу стримера с помощью Puppeteer
+   * Получить UID пользователя из страницы
    */
-  async getStreamerPage(nickname) {
+  async getUserId(nickname) {
     try {
-      const browser = await this.getBrowser();
-      const page = await browser.newPage();
-      
       const url = `${this.baseUrl}/u/${nickname}`;
-      await page.goto(url, { 
-        waitUntil: 'networkidle2',
-        timeout: 30000 
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
       });
       
-      // Ждём загрузки товаров (если есть сетка)
-      try {
-        await page.waitForSelector('.grid.auto-cols-fr', { timeout: 5000 });
-      } catch (e) {
-        // Вишлист может быть пуст
+      // Ищем UID в HTML
+      const uidMatch = response.data.match(/"userId":"([a-f0-9-]{36})"/i);
+      if (uidMatch) {
+        return uidMatch[1];
       }
       
-      const html = await page.content();
-      await page.close();
+      // Альтернативный поиск
+      const uidMatch2 = response.data.match(/uid=([a-f0-9-]{36})/i);
+      if (uidMatch2) {
+        return uidMatch2[1];
+      }
       
-      return html;
+      throw new Error('Не удалось найти UID пользователя');
     } catch (error) {
-      if (error.message.includes('404')) {
+      if (error.response && error.response.status === 404) {
         throw new Error('Стример не найден');
       }
-      throw new Error('Ошибка при получении страницы стримера');
+      throw error;
+    }
+  }
+
+  /**
+   * Получить товары через API
+   */
+  async getWishlistFromAPI(uid) {
+    try {
+      const response = await axios.get(
+        `${this.apiUrl}/product/products/public/get`,
+        {
+          params: {
+            uid: uid,
+            p: 0 // страница 0 = первая страница
+          }
+        }
+      );
+      
+      return response.data.products || [];
+    } catch (error) {
+      console.error('Ошибка при получении вишлиста из API:', error.message);
+      return [];
     }
   }
 
   /**
    * Парсинг профиля стримера
    */
-  parseStreamerProfile(html, nickname) {
+  async parseStreamerProfile(html, nickname, uid) {
     const $ = cheerio.load(html);
     
-    // Парсинг аватарки
     let avatar = null;
-    const avatarImg = $('img.rounded-full').first();
+    const avatarImg = $('img[alt="Profile picture"]').first();
     if (avatarImg.length) {
       avatar = avatarImg.attr('src');
-      // Если относительный путь, добавляем домен
       if (avatar && !avatar.startsWith('http')) {
         avatar = this.baseUrl + avatar;
       }
     }
 
-    // Парсинг имени стримера
     let name = nickname;
-    const nameElement = $('h1, h2, .name, [class*="name"]').first();
+    const nameElement = $('h2').first();
     if (nameElement.length) {
       name = nameElement.text().trim() || nickname;
     }
 
-    // Парсинг юзернейма
     let username = `@${nickname}`;
-    const usernameElement = $('[class*="username"], .username, [href*="t.me"]').first();
-    if (usernameElement.length) {
-      const usernameText = usernameElement.text().trim();
-      if (usernameText.startsWith('@')) {
-        username = usernameText;
-      }
+    const usernameElements = $('span').filter((i, el) => {
+      const text = $(el).text().trim();
+      return text.startsWith('@');
+    });
+    if (usernameElements.length) {
+      username = usernameElements.first().text().trim();
     }
 
-    // Парсинг описания
     let description = '';
-    const descriptionElement = $('p, .description, [class*="description"], [class*="bio"]').first();
-    if (descriptionElement.length) {
-      description = descriptionElement.text().trim();
+    const descElements = $('span').filter((i, el) => {
+      const text = $(el).text().trim();
+      const parent = $(el).parent();
+      return text.length > 20 && !text.startsWith('@') && parent.prop('tagName') === 'DIV';
+    });
+    if (descElements.length) {
+      description = descElements.first().text().trim();
     }
 
-    // Парсинг ссылок на соцсети
     const socialLinks = [];
-    $('a[href]').each((i, elem) => {
+    $('a[target="_blank"]').each((i, elem) => {
       const href = $(elem).attr('href');
       if (href) {
         if (href.includes('twitch.tv')) {
           socialLinks.push({ platform: 'twitch', url: href });
         } else if (href.includes('youtube.com') || href.includes('youtu.be')) {
           socialLinks.push({ platform: 'youtube', url: href });
-        } else if (href.includes('t.me') || href.includes('telegram')) {
+        } else if (href.includes('t.me')) {
           socialLinks.push({ platform: 'telegram', url: href });
         } else if (href.includes('twitter.com') || href.includes('x.com')) {
           socialLinks.push({ platform: 'twitter', url: href });
-        } else if (href.includes('instagram.com')) {
-          socialLinks.push({ platform: 'instagram', url: href });
-        } else if (href.includes('vk.com')) {
-          socialLinks.push({ platform: 'vk', url: href });
         }
       }
     });
@@ -120,62 +125,9 @@ class FettaParser {
       avatar,
       description,
       socialLinks,
-      fettaUrl: `${this.baseUrl}/u/${nickname}`
+      fettaUrl: `${this.baseUrl}/u/${nickname}`,
+      uid
     };
-  }
-
-  /**
-   * Парсинг вишлиста (список товаров)
-   */
-  parseWishlist(html) {
-    const $ = cheerio.load(html);
-    const items = [];
-
-    // Ищем сетку с товарами (grid с auto-cols-fr)
-    const gridContainer = $('.grid.auto-cols-fr, .grid.grid-cols-2, .grid.grid-cols-3, .grid.grid-cols-4');
-    
-    if (gridContainer.length) {
-      // Ищем карточки товаров внутри сетки
-      gridContainer.find('.group.relative').each((i, elem) => {
-        const $item = $(elem);
-        
-        // Пропускаем плейсхолдеры (анимация загрузки)
-        if ($item.hasClass('animate-pulse')) {
-          return;
-        }
-        
-        // Парсинг картинки
-        const img = $item.find('img[alt="Product picture"]').first();
-        const image = img.attr('src');
-        
-        // Парсинг цены (текст с font-semibold)
-        const priceElement = $item.find('.font-semibold').first();
-        const price = priceElement.text().trim();
-        
-        // Парсинг названия (текст с line-clamp-2)
-        const nameElement = $item.find('.line-clamp-2').first();
-        const name = nameElement.text().trim();
-        
-        // Парсинг ссылки (если есть)
-        let productUrl = '';
-        const linkElement = $item.find('a[href]').first();
-        if (linkElement.length) {
-          productUrl = linkElement.attr('href');
-        }
-
-        // Добавляем только если есть картинка или название
-        if (image || name) {
-          items.push({
-            image,
-            price,
-            name,
-            productUrl
-          });
-        }
-      });
-    }
-
-    return items;
   }
 
   /**
@@ -183,9 +135,33 @@ class FettaParser {
    */
   async getStreamerInfo(nickname) {
     try {
-      const html = await this.getStreamerPage(nickname);
-      const profile = this.parseStreamerProfile(html, nickname);
-      const wishlist = this.parseWishlist(html);
+      console.log(`Получение данных для стримера: ${nickname}`);
+      
+      // Получаем UID
+      const uid = await this.getUserId(nickname);
+      console.log(`UID найден: ${uid}`);
+      
+      // Получаем страницу для профиля
+      const pageResponse = await axios.get(`${this.baseUrl}/u/${nickname}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      // Парсим профиль
+      const profile = await this.parseStreamerProfile(pageResponse.data, nickname, uid);
+      
+      // Получаем вишлист из API
+      const apiProducts = await this.getWishlistFromAPI(uid);
+      console.log(`Получено товаров из API: ${apiProducts.length}`);
+      
+      // Преобразуем формат API в наш формат
+      const wishlist = apiProducts.map(product => ({
+        image: product.imageUrl,
+        price: product.price ? `${product.price} ₽` : '',
+        name: product.name,
+        productUrl: product.externalId ? `https://www.ozon.ru/product/${product.externalId}` : ''
+      }));
       
       return {
         success: true,
@@ -193,6 +169,7 @@ class FettaParser {
         wishlist
       };
     } catch (error) {
+      console.error('Ошибка при получении информации о стримере:', error.message);
       return {
         success: false,
         error: error.message

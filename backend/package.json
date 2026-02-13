@@ -14,8 +14,7 @@
     "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.12",
     "node-cron": "^3.0.3",
-    "better-sqlite3": "^9.2.2",
-    "puppeteer": "^21.7.0"
+    "better-sqlite3": "^9.2.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
