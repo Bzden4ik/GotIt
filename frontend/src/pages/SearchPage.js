@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
-import DecodeText from '../components/DecodeText';
-import PageTransition from '../components/PageTransition';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -82,90 +80,86 @@ function SearchPage({ user }) {
   };
 
   return (
-    <PageTransition>
-      <div className="search-page">
-        <div className="container bvl">
-          <h2>
-            <DecodeText text="🔍 Найти стримера" />
-          </h2>
+    <div className="search-page">
+      <div className="container bvl">
+        <h2>🔍 Найти стримера</h2>
         
-          <form onSubmit={handleSearch} className="search-form">
-            <input
-              type="text"
-              placeholder="Введите ник стримера..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn" disabled={loading}>
-              {loading ? 'Поиск...' : 'Найти'}
-            </button>
-          </form>
+        <form onSubmit={handleSearch} className="search-form">
+          <input
+            type="text"
+            placeholder="Введите ник стримера..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+          <button type="submit" className="search-btn" disabled={loading}>
+            {loading ? 'Поиск...' : 'Найти'}
+          </button>
+        </form>
 
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
-          {searchResults.length > 0 && (
-            <div className="search-results">
-              {searchResults.map((streamer, index) => (
-                <div key={index} className="streamer-card">
-                  {streamer.avatar && (
-                    <img 
-                      src={streamer.avatar} 
-                      alt={streamer.nickname} 
-                      className="streamer-avatar"
-                      onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/80';
-                      }}
-                    />
+        {searchResults.length > 0 && (
+          <div className="search-results">
+            {searchResults.map((streamer, index) => (
+              <div key={index} className="streamer-card">
+                {streamer.avatar && (
+                  <img 
+                    src={streamer.avatar} 
+                    alt={streamer.nickname} 
+                    className="streamer-avatar"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/80';
+                    }}
+                  />
+                )}
+                <div className="streamer-info">
+                  <h3>{streamer.name || streamer.nickname}</h3>
+                  <p className="username">{streamer.username}</p>
+                  {streamer.description && (
+                    <p className="description">{streamer.description}</p>
                   )}
-                  <div className="streamer-info">
-                    <h3>{streamer.name || streamer.nickname}</h3>
-                    <p className="username">{streamer.username}</p>
-                    {streamer.description && (
-                      <p className="description">{streamer.description}</p>
-                    )}
-                    {streamer.socialLinks && streamer.socialLinks.length > 0 && (
-                      <div className="social-links">
-                        {streamer.socialLinks.map((link, idx) => (
-                          <a 
-                            key={idx} 
-                            href={link.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="social-link"
-                            title={link.platform}
-                          >
-                            {link.platform}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button 
-                    className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
-                    onClick={() => handleTrack(streamer)}
-                  >
-                    {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
-                  </button>
+                  {streamer.socialLinks && streamer.socialLinks.length > 0 && (
+                    <div className="social-links">
+                      {streamer.socialLinks.map((link, idx) => (
+                        <a 
+                          key={idx} 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="social-link"
+                          title={link.platform}
+                        >
+                          {link.platform}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        
-          {toast && (
-            <Toast
-              message={toast.message}
-              type={toast.type}
-              onClose={() => setToast(null)}
-            />
-          )}
-        </div>
+                <button 
+                  className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
+                  onClick={() => handleTrack(streamer)}
+                >
+                  {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </PageTransition>
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
   );
 }
 
