@@ -4,6 +4,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
+const Scheduler = require('./scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -273,4 +274,14 @@ app.get('/api/streamer/:id/wishlist', async (req, res) => {
 // Запуск сервера
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
+  
+  // Запускаем планировщик проверки вишлистов
+  const scheduler = new Scheduler(BOT_TOKEN);
+  
+  // По умолчанию: каждые 30 минут
+  // Можно настроить через переменную окружения CHECK_INTERVAL
+  const checkInterval = process.env.CHECK_INTERVAL || '*/30 * * * *';
+  scheduler.start(checkInterval);
+  
+  console.log(`Планировщик настроен на: ${checkInterval}`);
 });

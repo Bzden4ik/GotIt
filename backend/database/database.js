@@ -211,6 +211,26 @@ class DatabaseService {
     return hash.toString();
   }
 
+  // Методы для планировщика
+  getAllTrackedStreamers() {
+    const stmt = this.db.prepare(`
+      SELECT DISTINCT s.*
+      FROM streamers s
+      JOIN user_streamers us ON s.id = us.streamer_id
+    `);
+    return stmt.all();
+  }
+
+  getStreamerFollowers(streamerId) {
+    const stmt = this.db.prepare(`
+      SELECT u.*
+      FROM users u
+      JOIN user_streamers us ON u.id = us.user_id
+      WHERE us.streamer_id = ?
+    `);
+    return stmt.all(streamerId);
+  }
+
   close() {
     this.db.close();
   }
