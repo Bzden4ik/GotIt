@@ -19,18 +19,21 @@ class FettaParser {
         }
       });
       
-      // Ищем UID в HTML
-      const uidMatch = response.data.match(/"userId":"([a-f0-9-]{36})"/i);
+      // Ищем UID в HTML - убираем флаг i для case-sensitive
+      const uidMatch = response.data.match(/"userId":"([a-f0-9\-]{36})"/);
       if (uidMatch) {
+        console.log(`UID найден: ${uidMatch[1]}`);
         return uidMatch[1];
       }
       
       // Альтернативный поиск
-      const uidMatch2 = response.data.match(/uid=([a-f0-9-]{36})/i);
+      const uidMatch2 = response.data.match(/"wishlistOwnerId":"([a-f0-9\-]{36})"/);
       if (uidMatch2) {
+        console.log(`UID найден (альт): ${uidMatch2[1]}`);
         return uidMatch2[1];
       }
       
+      console.error('Не удалось найти UID в HTML');
       throw new Error('Не удалось найти UID пользователя');
     } catch (error) {
       if (error.response && error.response.status === 404) {
