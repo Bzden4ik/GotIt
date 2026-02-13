@@ -51,34 +51,6 @@ app.get('/api/streamer/search', async (req, res) => {
   }
 });
 
-// Эндпоинт для получения вишлиста
-app.get('/api/streamer/:nickname/wishlist', async (req, res) => {
-  const { nickname } = req.params;
-
-  try {
-    console.log(`Получение вишлиста для: ${nickname}`);
-    const result = await fettaParser.getStreamerInfo(nickname);
-    
-    if (!result.success) {
-      return res.status(404).json({ 
-        success: false, 
-        error: result.error 
-      });
-    }
-    
-    res.json({
-      success: true,
-      items: result.wishlist
-    });
-  } catch (error) {
-    console.error('Ошибка при получении вишлиста:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Ошибка при получении вишлиста' 
-    });
-  }
-});
-
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
 });
