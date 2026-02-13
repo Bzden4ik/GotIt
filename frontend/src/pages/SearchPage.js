@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiService from '../services/api';
+import Toast from '../components/Toast';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -19,6 +23,14 @@ function SearchPage({ user }) {
       const response = await apiService.searchStreamer(searchQuery.trim());
       
       if (response.success && response.streamer) {
+        // Проверяем отслеживается ли стример
+        if (user) {
+          const checkResult = await apiService.checkIfTracked(response.streamer.nickname);
+          response.streamer.isTracked = checkResult.isTracked || false;
+        } else {
+          response.streamer.isTracked = false;
+        }
+        
         setSearchResults([response.streamer]);
       } else {
         setError('Стример не найден');
@@ -34,23 +46,33 @@ function SearchPage({ user }) {
 
   const handleTrack = async (streamer) => {
     if (!user) {
-      alert('Для отслеживания стримеров необходимо войти через Telegram');
+      setToast({ type: 'warning', message: 'Для отслеживания стримеров необходимо войти через Telegram' });
       return;
     }
+    
+    // Если уже отслеживается - переходим на страницу отслеживаемых
+    if (streamer.isTracked) {
+      navigate('/tracked');
+      return;
+    }
+    
     try {
       setLoading(true);
       await apiService.addTrackedStreamer(streamer.nickname);
-      alert(`Стример ${streamer.nickname} добавлен в отслеживаемые!`);
+      
+      // Обновляем статус в результатах поиска
+      setSearchResults(prev => 
+        prev.map(s => s.nickname === streamer.nickname ? { ...s, isTracked: true } : s)
+      );
+      
+      setToast({ type: 'success', message: `Стример ${streamer.nickname} добавлен в отслеживаемые!` });
     } catch (err) {
       const errorMsg = err.message || 'Ошибка при добавлении стримера';
       
-      // Проверяем нужна ли переавторизация
       if (errorMsg.includes('Сессия устарела') || errorMsg.includes('войдите заново')) {
-        alert('Ваша сессия устарела. Пожалуйста, выйдите и войдите заново через Telegram');
-        // Можно автоматически разлогинить
-        // window.location.reload();
+        setToast({ type: 'error', message: 'Ваша сессия устарела. Пожалуйста, выйдите и войдите заново через Telegram' });
       } else {
-        alert(errorMsg);
+        setToast({ type: 'error', message: errorMsg });
       }
     } finally {
       setLoading(false);
@@ -119,16 +141,24 @@ function SearchPage({ user }) {
                   )}
                 </div>
                 <button 
-                  className="track-btn"
+                  className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
                   onClick={() => handleTrack(streamer)}
                 >
-                  Отслеживать
+                  {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

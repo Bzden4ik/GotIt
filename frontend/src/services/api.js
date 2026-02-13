@@ -93,6 +93,20 @@ class ApiService {
   }
 
   /**
+   * Проверить отслеживается ли стример
+   */
+  async checkIfTracked(nickname) {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/tracked/check/${nickname}`, {
+        params: { userId: this.userId }
+      });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Удалить стримера из отслеживаемых
    */
   async removeTrackedStreamer(streamerId) {

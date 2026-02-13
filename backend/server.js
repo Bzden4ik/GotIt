@@ -168,6 +168,32 @@ app.post('/api/tracked', async (req, res) => {
   }
 
   try {
+    // Проверяем, может стример уже в базе и отслеживается
+    const existingStreamer = db.getStreamerByNickname(nickname);
+    if (existingStreamer) {
+      const isTracked = db.isStreamerTracked(userId, existingStreamer.id);
+      if (isTracked) {
+        return res.json({
+          success: true,
+          streamer: {
+            ...existingStreamer,
+            itemsCount: db.getWishlistItems(existingStreamer.id).length
+          },
+          message: 'Стример уже в отслеживаемых'
+        });
+      }
+      
+      // Стример есть в базе, но не отслеживается - просто добавляем связь
+      db.addTrackedStreamer(userId, existingStreamer.id);
+      return res.json({
+        success: true,
+        streamer: {
+          ...existingStreamer,
+          itemsCount: db.getWishlistItems(existingStreamer.id).length
+        }
+      });
+    }
+    
     // Получаем данные стримера с fetta.app
     const result = await fettaParser.getStreamerInfo(nickname);
     
@@ -258,6 +284,33 @@ app.get('/api/tracked', async (req, res) => {
       success: false, 
       error: 'Ошибка при получении списка' 
     });
+  }
+});
+
+// Проверка отслеживается ли стример
+app.get('/api/tracked/check/:nickname', async (req, res) => {
+  const { nickname } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.json({ success: true, isTracked: false });
+  }
+
+  try {
+    const streamer = db.getStreamerByNickname(nickname);
+    if (!streamer) {
+      return res.json({ success: true, isTracked: false });
+    }
+
+    const isTracked = db.isStreamerTracked(userId, streamer.id);
+    res.json({ 
+      success: true, 
+      isTracked,
+      streamerId: streamer.id
+    });
+  } catch (error) {
+    console.error('Ошибка проверки отслеживания:', error);
+    res.status(500).json({ success: false, error: 'Ошибка проверки' });
   }
 });
 

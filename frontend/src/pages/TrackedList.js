@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/api';
 import WishlistModal from '../components/WishlistModal';
+import ConfirmModal from '../components/ConfirmModal';
+import Toast from '../components/Toast';
 import './TrackedList.css';
 
 function TrackedList({ user }) {
   const [trackedStreamers, setTrackedStreamers] = useState([]);
   const [selectedStreamer, setSelectedStreamer] = useState(null);
+  const [streamerToDelete, setStreamerToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -32,13 +36,20 @@ function TrackedList({ user }) {
   };
 
   const handleRemove = async (streamerId) => {
-    if (!window.confirm('Удалить стримера из отслеживаемых?')) return;
+    setStreamerToDelete(streamerId);
+  };
 
+  const confirmDelete = async () => {
+    if (!streamerToDelete) return;
+    
     try {
-      await apiService.removeTrackedStreamer(streamerId);
-      setTrackedStreamers(prev => prev.filter(s => s.id !== streamerId));
+      await apiService.removeTrackedStreamer(streamerToDelete);
+      setTrackedStreamers(prev => prev.filter(s => s.id !== streamerToDelete));
+      setToast({ type: 'success', message: 'Стример удален из отслеживаемых' });
     } catch (err) {
-      alert(err.message || 'Ошибка при удалении');
+      setToast({ type: 'error', message: err.message || 'Ошибка при удалении' });
+    } finally {
+      setStreamerToDelete(null);
     }
   };
 
@@ -134,6 +145,23 @@ function TrackedList({ user }) {
         <WishlistModal
           streamer={selectedStreamer}
           onClose={() => setSelectedStreamer(null)}
+        />
+      )}
+      
+      {streamerToDelete && (
+        <ConfirmModal
+          title="Удалить стримера?"
+          message="Вы уверены, что хотите удалить этого стримера из отслеживаемых?"
+          onConfirm={confirmDelete}
+          onCancel={() => setStreamerToDelete(null)}
+        />
+      )}
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>
