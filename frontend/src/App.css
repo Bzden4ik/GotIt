@@ -17,7 +17,7 @@
 }
 
 .container {
-  display: block !important;
+  display: flex;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
@@ -74,6 +74,10 @@
 
 .nav-link:hover::after {
   width: 100%;
+}
+
+.bvl{
+  display: block !important;
 }
 
 /* User Section */

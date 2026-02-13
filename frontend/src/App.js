@@ -102,7 +102,7 @@ function App() {
       <div className="app">
         <header className="header">
           <div className="container">
-            <h1 className="logo">GotIt</h1>
+            <h1 className="logo" href="https://bzden4ik.github.io/GotIt">GotIt</h1>
             <nav className="nav">
               <Link to="/" className="nav-link">Поиск</Link>
               <Link to="/tracked" className="nav-link">Отслеживаю</Link>

@@ -83,7 +83,7 @@ function TrackedList({ user }) {
 
   return (
     <div className="tracked-list">
-      <div className="container">
+      <div className="container bvl">
         <h2>⭐ Отслеживаемые стримеры</h2>
         
         {trackedStreamers.length === 0 ? (
