@@ -1,25 +1,50 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 
 class FettaParser {
   constructor() {
     this.baseUrl = 'https://fetta.app';
+    this.browser = null;
+  }
+
+  async getBrowser() {
+    if (!this.browser) {
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+    }
+    return this.browser;
   }
 
   /**
-   * Получить страницу стримера
+   * Получить страницу стримера с помощью Puppeteer
    */
   async getStreamerPage(nickname) {
     try {
+      const browser = await this.getBrowser();
+      const page = await browser.newPage();
+      
       const url = `${this.baseUrl}/u/${nickname}`;
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+      await page.goto(url, { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
       });
-      return response.data;
+      
+      // Ждём загрузки товаров (если есть сетка)
+      try {
+        await page.waitForSelector('.grid.auto-cols-fr', { timeout: 5000 });
+      } catch (e) {
+        // Вишлист может быть пуст
+      }
+      
+      const html = await page.content();
+      await page.close();
+      
+      return html;
     } catch (error) {
-      if (error.response && error.response.status === 404) {
+      if (error.message.includes('404')) {
         throw new Error('Стример не найден');
       }
       throw new Error('Ошибка при получении страницы стримера');
