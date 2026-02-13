@@ -4,7 +4,6 @@
   flex-direction: column;
 }
 
-/* ── Header ── */
 .header {
   position: sticky;
   top: 0;
@@ -16,17 +15,20 @@
 }
 
 .container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.header .container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 0 24px;
-  height: 60px;
+  height: 68px;
 }
 
 .logo {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: var(--cyan);
@@ -35,11 +37,11 @@
 }
 .logo:hover { opacity: 0.8; }
 
-.nav { display: flex; gap: 4px; }
+.nav { display: flex; gap: 6px; }
 
 .nav-link {
-  padding: 7px 16px;
-  font-size: 13px;
+  padding: 9px 20px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--dim);
   border-radius: var(--r-pill);
@@ -55,23 +57,22 @@
 .user-logged {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 5px 5px 14px;
+  gap: 12px;
+  padding: 6px 6px 6px 18px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
 }
 
 .user-info {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--white);
-  letter-spacing: 0.01em;
 }
 
 .logout-btn {
-  padding: 5px 12px;
-  font-size: 11px;
+  padding: 7px 16px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--dim);
   background: transparent;
@@ -79,8 +80,6 @@
   border-radius: var(--r-pill);
   cursor: pointer;
   transition: all 0.2s;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .logout-btn:hover {
   color: var(--rose);
@@ -89,7 +88,7 @@
 
 .main {
   flex: 1;
-  padding: 56px 24px 80px;
+  padding: 56px 28px 80px;
   animation: fadeUp 0.7s var(--ease);
 }
 
@@ -100,8 +99,8 @@
 }
 
 @media (max-width: 600px) {
-  .container { padding: 0 14px; height: 52px; }
-  .nav-link { padding: 6px 10px; font-size: 12px; }
-  .main { padding: 36px 14px 60px; }
-  .user-logged { gap: 6px; padding: 4px 4px 4px 10px; }
+  .container { padding: 0 16px; }
+  .header .container { height: 58px; }
+  .nav-link { padding: 7px 14px; font-size: 14px; }
+  .main { padding: 36px 16px 60px; }
 }

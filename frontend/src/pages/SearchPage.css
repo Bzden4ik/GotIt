@@ -1,18 +1,18 @@
-.search-page { max-width: 680px; margin: 0 auto; width: 100%; }
+.search-page { max-width: 800px; margin: 0 auto; width: 100%; }
 
 .page-title {
-  font-size: clamp(32px, 5.5vw, 52px);
+  font-size: clamp(44px, 7vw, 68px);
   font-weight: 300;
   letter-spacing: -0.045em;
   color: var(--white);
   line-height: 1.15;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 18px;
   color: var(--dim);
-  margin-bottom: 44px;
+  margin-bottom: 52px;
   animation: fadeUp 0.7s var(--ease) 0.4s both;
 }
 
@@ -20,13 +20,12 @@
 .search-form {
   display: flex;
   width: 100%;
-  margin-bottom: 48px;
-  animation: fadeUp 0.6s var(--ease) 0.55s both;
+  margin-bottom: 56px;
   border-radius: var(--r-lg);
   border: 1px solid var(--line);
   background: var(--surface);
-  overflow: hidden;
   transition: border-color 0.35s, box-shadow 0.35s;
+  animation: fadeUp 0.6s var(--ease);
 }
 .search-form:focus-within {
   border-color: var(--line-hover);
@@ -35,27 +34,30 @@
 
 .search-input {
   flex: 1;
-  padding: 16px 22px;
+  padding: 22px 26px;
   background: transparent;
   border: none;
   color: var(--white);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 400;
   outline: none;
+  min-width: 0;
 }
 .search-input::placeholder { color: var(--ghost); }
 
 .search-btn {
-  padding: 16px 30px;
+  padding: 22px 40px;
   border: none;
   background: var(--cyan);
   color: var(--black);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.25s var(--ease);
+  white-space: nowrap;
+  border-radius: 0 var(--r-lg) var(--r-lg) 0;
 }
 .search-btn:hover:not(:disabled) { filter: brightness(1.12); }
 .search-btn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -63,13 +65,13 @@
 /* ── Error ── */
 .error-message {
   width: 100%;
-  padding: 14px 18px;
+  padding: 18px 22px;
   background: rgba(251,113,133,0.06);
   border: 1px solid rgba(251,113,133,0.12);
   border-radius: var(--r);
   color: var(--rose);
-  font-size: 13px;
-  margin-bottom: 20px;
+  font-size: 16px;
+  margin-bottom: 28px;
   animation: fadeIn 0.3s;
 }
 
@@ -79,8 +81,8 @@
 .streamer-card {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 22px;
+  gap: 24px;
+  padding: 32px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -93,7 +95,7 @@
 }
 
 .streamer-avatar {
-  width: 68px; height: 68px;
+  width: 88px; height: 88px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--line);
@@ -101,14 +103,14 @@
 }
 
 .streamer-info { flex: 1; min-width: 0; }
-.streamer-info h3 { font-size: 18px; font-weight: 600; margin-bottom: 2px; }
-.username { font-size: 12px; color: var(--cyan); margin-bottom: 6px; }
-.description { font-size: 12px; color: var(--dim); line-height: 1.5; margin-bottom: 8px; }
+.streamer-info h3 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+.username { font-size: 15px; color: var(--cyan); margin-bottom: 10px; }
+.description { font-size: 15px; color: var(--dim); line-height: 1.5; margin-bottom: 12px; }
 
-.social-links { display: flex; gap: 5px; flex-wrap: wrap; }
+.social-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .social-link {
-  padding: 3px 9px;
-  font-size: 10px;
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -121,10 +123,10 @@
 
 /* Track Button */
 .track-btn {
-  padding: 10px 24px;
+  padding: 16px 34px;
   border: none;
   border-radius: var(--r-pill);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -147,6 +149,7 @@
 }
 
 @media (max-width: 600px) {
-  .streamer-card { flex-direction: column; text-align: center; padding: 18px; }
-  .search-btn { padding: 16px 20px; }
+  .streamer-card { flex-direction: column; text-align: center; padding: 24px; }
+  .search-input { padding: 20px 20px; font-size: 17px; }
+  .search-btn { padding: 20px 28px; font-size: 15px; }
 }

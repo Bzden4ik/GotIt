@@ -1,41 +1,39 @@
-.tracked-list { max-width: 1060px; margin: 0 auto; width: 100%; }
+.tracked-list { max-width: 1100px; margin: 0 auto; width: 100%; }
 
 .tracked-list .page-title {
-  font-size: clamp(32px, 5.5vw, 52px);
+  font-size: clamp(44px, 7vw, 68px);
   font-weight: 300;
   letter-spacing: -0.045em;
   color: var(--white);
-  margin-bottom: 44px;
+  margin-bottom: 52px;
 }
 
 .loading, .empty-state {
   text-align: center;
-  padding: 72px 20px;
+  padding: 80px 20px;
   animation: fadeUp 0.5s var(--ease);
 }
-.loading { font-size: 14px; color: var(--dim); }
-.empty-state p { font-size: 15px; color: var(--dim); margin-bottom: 4px; }
-.hint { font-size: 12px; color: var(--ghost); }
+.loading { font-size: 17px; color: var(--dim); }
+.empty-state p { font-size: 18px; color: var(--dim); margin-bottom: 8px; }
+.hint { font-size: 15px; color: var(--ghost); }
 
-/* ── Grid ── */
 .streamers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 22px;
   animation: fadeUp 0.6s var(--ease) 0.2s both;
 }
 
-/* ── Card ── */
 .streamer-card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  padding: 22px;
+  padding: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
+  gap: 16px;
   transition: all 0.3s var(--ease);
 }
 .streamer-card:hover {
@@ -45,19 +43,19 @@
 }
 
 .streamer-avatar {
-  width: 64px; height: 64px;
+  width: 88px; height: 88px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--line);
 }
 
-.streamer-info h3 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
-.username { font-size: 12px; color: var(--cyan); margin-bottom: 6px; }
+.streamer-info h3 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.username { font-size: 15px; color: var(--cyan); margin-bottom: 10px; }
 
 .items-count {
   display: inline-block;
-  padding: 3px 10px;
-  font-size: 11px;
+  padding: 6px 16px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--dim);
   border: 1px solid var(--line);
@@ -66,18 +64,18 @@
 
 .card-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: 10px;
 }
 
 .view-btn, .remove-btn {
   flex: 1;
-  padding: 9px 0;
+  padding: 14px 0;
   border: none;
   border-radius: var(--r);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s var(--ease);
@@ -104,6 +102,8 @@
 }
 
 @media (max-width: 600px) {
-  .streamers-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .streamer-card { padding: 16px; }
+  .streamers-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .streamer-card { padding: 22px; }
+  .streamer-avatar { width: 68px; height: 68px; }
+  .view-btn, .remove-btn { font-size: 13px; padding: 12px 0; }
 }

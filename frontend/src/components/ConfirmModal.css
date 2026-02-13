@@ -16,39 +16,39 @@
   background: var(--void);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  max-width: 400px;
+  max-width: 440px;
   width: 100%;
   box-shadow: 0 20px 50px rgba(0,0,0,0.7);
   animation: scaleIn 0.25s var(--spring);
 }
 
-.confirm-modal-header { padding: 22px 22px 10px; }
-.confirm-modal-header h3 { font-size: 16px; font-weight: 600; }
+.confirm-modal-header { padding: 26px 26px 12px; }
+.confirm-modal-header h3 { font-size: 19px; font-weight: 600; }
 
-.confirm-modal-body { padding: 6px 22px 18px; }
-.confirm-modal-body p { font-size: 13px; color: var(--dim); line-height: 1.6; margin-bottom: 14px; }
+.confirm-modal-body { padding: 8px 26px 22px; }
+.confirm-modal-body p { font-size: 15px; color: var(--dim); line-height: 1.6; margin-bottom: 16px; }
 
 .confirm-remember-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   transition: background 0.2s;
 }
 .confirm-remember-checkbox:hover { background: rgba(255,255,255,0.02); }
-.confirm-remember-checkbox input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--cyan); }
-.confirm-remember-checkbox span { font-size: 11px; color: var(--dim); user-select: none; }
+.confirm-remember-checkbox input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--cyan); }
+.confirm-remember-checkbox span { font-size: 13px; color: var(--dim); user-select: none; }
 
-.confirm-modal-footer { padding: 0 22px 22px; display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-modal-footer { padding: 0 26px 26px; display: flex; gap: 10px; justify-content: flex-end; }
 
 .confirm-btn-cancel, .confirm-btn-confirm {
-  padding: 9px 18px;
+  padding: 11px 22px;
   border: none;
   border-radius: var(--r);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s var(--ease);

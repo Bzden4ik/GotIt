@@ -1,4 +1,3 @@
-/* ── Overlay ── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -17,7 +16,7 @@
   background: var(--void);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  max-width: 880px;
+  max-width: 960px;
   width: 100%;
   max-height: 88vh;
   display: flex;
@@ -27,35 +26,34 @@
   animation: scaleIn 0.3s var(--ease);
 }
 
-/* ── Header ── */
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  padding: 24px 28px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
 
-.streamer-info-header { display: flex; align-items: center; gap: 12px; }
+.streamer-info-header { display: flex; align-items: center; gap: 16px; }
 
 .streamer-avatar-small {
-  width: 42px; height: 42px;
+  width: 56px; height: 56px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--line);
 }
 
-.streamer-info-header h2 { font-size: 17px; font-weight: 600; margin: 0; }
-.streamer-info-header .username { font-size: 12px; color: var(--cyan); margin: 0; }
+.streamer-info-header h2 { font-size: 22px; font-weight: 600; margin: 0; }
+.streamer-info-header .username { font-size: 15px; color: var(--cyan); margin: 0; }
 
 .close-btn {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   border: none;
   background: rgba(255,255,255,0.04);
   border-radius: 50%;
   color: var(--dim);
-  font-size: 18px;
+  font-size: 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -68,21 +66,19 @@
   transform: rotate(90deg);
 }
 
-/* ── Body ── */
-.modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+.modal-body { flex: 1; overflow-y: auto; padding: 28px; }
 
 .empty-wishlist {
   text-align: center;
-  padding: 56px 16px;
+  padding: 64px 16px;
   color: var(--dim);
-  font-size: 14px;
+  font-size: 17px;
 }
 
-/* ── Product Grid ── */
 .wishlist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
 }
 
 .wishlist-item {
@@ -111,21 +107,21 @@
 }
 
 .item-info {
-  padding: 12px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
 }
 
 .item-price {
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--cyan);
 }
 
 .item-name {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--dim);
   line-height: 1.4;
   display: -webkit-box;
@@ -136,18 +132,17 @@
 
 .item-buttons {
   display: flex;
-  gap: 5px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 10px;
 }
 
 .item-link {
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 10px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -166,9 +161,8 @@
 }
 .item-link-marketplace:hover { background: rgba(52,211,153,0.12); }
 
-/* ── Footer ── */
 .modal-footer {
-  padding: 14px 22px;
+  padding: 20px 28px;
   border-top: 1px solid var(--line);
   background: var(--surface);
   display: flex;
@@ -178,12 +172,12 @@
 .fetta-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 9px 24px;
+  gap: 8px;
+  padding: 14px 34px;
   background: var(--cyan);
   border-radius: var(--r-pill);
   color: var(--black);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.03em;
   transition: all 0.25s var(--spring);
@@ -194,7 +188,8 @@
 }
 
 @media (max-width: 600px) {
-  .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .modal-content { max-height: 94vh; }
-  .modal-body { padding: 14px; }
+  .modal-body { padding: 18px; }
+  .item-info { padding: 14px; }
 }
