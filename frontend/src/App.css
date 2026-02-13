@@ -17,11 +17,10 @@
 }
 
 .container {
-  display: block;
+  display: block !important;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
-  display: flex;
   align-items: center;
   justify-content: space-between;
   height: 72px;
