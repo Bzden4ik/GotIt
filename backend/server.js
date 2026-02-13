@@ -51,10 +51,6 @@ app.get('/api/streamer/search', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
-});
-
 // Добавить стримера в отслеживаемые
 app.post('/api/tracked', async (req, res) => {
   const { nickname, userId = 1 } = req.body; // TODO: реальный userId из Telegram
@@ -185,4 +181,9 @@ app.get('/api/streamer/:id/wishlist', async (req, res) => {
       error: 'Ошибка при получении вишлиста' 
     });
   }
+});
+
+// Запуск сервера
+app.listen(PORT, () => {
+  console.log(`Сервер запущен на порту ${PORT}`);
 });
