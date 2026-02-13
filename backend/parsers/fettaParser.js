@@ -106,47 +106,49 @@ class FettaParser {
     const $ = cheerio.load(html);
     const items = [];
 
-    // Ищем контейнер с товарами (может быть grid, flex и т.д.)
-    const itemContainers = $('.grid > div, .flex > div, [class*="card"], [class*="item"], [class*="product"]');
+    // Ищем сетку с товарами (grid с auto-cols-fr)
+    const gridContainer = $('.grid.auto-cols-fr, .grid.grid-cols-2, .grid.grid-cols-3, .grid.grid-cols-4');
     
-    itemContainers.each((i, elem) => {
-      const $item = $(elem);
-      
-      // Парсинг картинки товара
-      const img = $item.find('img').first();
-      const image = img.attr('src') || img.attr('data-src');
-      
-      // Парсинг цены
-      let price = '';
-      const priceElement = $item.find('[class*="price"], .price, [class*="cost"]').first();
-      if (priceElement.length) {
-        price = priceElement.text().trim();
-      }
-      
-      // Парсинг названия/описания
-      let name = '';
-      const nameElement = $item.find('[class*="title"], .title, [class*="name"], p, span').first();
-      if (nameElement.length) {
-        name = nameElement.text().trim();
-      }
-      
-      // Парсинг ссылки на товар
-      let productUrl = '';
-      const linkElement = $item.find('a[href]').first();
-      if (linkElement.length) {
-        productUrl = linkElement.attr('href');
-      }
+    if (gridContainer.length) {
+      // Ищем карточки товаров внутри сетки
+      gridContainer.find('.group.relative').each((i, elem) => {
+        const $item = $(elem);
+        
+        // Пропускаем плейсхолдеры (анимация загрузки)
+        if ($item.hasClass('animate-pulse')) {
+          return;
+        }
+        
+        // Парсинг картинки
+        const img = $item.find('img[alt="Product picture"]').first();
+        const image = img.attr('src');
+        
+        // Парсинг цены (текст с font-semibold)
+        const priceElement = $item.find('.font-semibold').first();
+        const price = priceElement.text().trim();
+        
+        // Парсинг названия (текст с line-clamp-2)
+        const nameElement = $item.find('.line-clamp-2').first();
+        const name = nameElement.text().trim();
+        
+        // Парсинг ссылки (если есть)
+        let productUrl = '';
+        const linkElement = $item.find('a[href]').first();
+        if (linkElement.length) {
+          productUrl = linkElement.attr('href');
+        }
 
-      // Добавляем только если есть хотя бы картинка или название
-      if (image || name) {
-        items.push({
-          image: image && !image.startsWith('http') ? this.baseUrl + image : image,
-          price,
-          name,
-          productUrl
-        });
-      }
-    });
+        // Добавляем только если есть картинка или название
+        if (image || name) {
+          items.push({
+            image,
+            price,
+            name,
+            productUrl
+          });
+        }
+      });
+    }
 
     return items;
   }
