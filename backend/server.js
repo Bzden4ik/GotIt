@@ -80,9 +80,15 @@ app.post('/api/tracked', async (req, res) => {
       fettaUrl: result.profile.fettaUrl
     });
 
+    console.log(`Стример сохранён, ID: ${streamer.id}`);
+    console.log(`Количество товаров в вишлисте: ${result.wishlist.length}`);
+
     // Сохраняем вишлист
     if (result.wishlist && result.wishlist.length > 0) {
       db.saveWishlistItems(streamer.id, result.wishlist);
+      console.log(`Вишлист сохранён для стримера ${streamer.id}`);
+    } else {
+      console.log('Вишлист пуст, ничего не сохраняем');
     }
 
     // Добавляем в отслеживаемые
