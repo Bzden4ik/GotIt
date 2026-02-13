@@ -28,6 +28,15 @@ class DatabaseService {
       )
     `);
 
+    // Создаём дефолтного пользователя для разработки
+    const defaultUser = this.db.prepare('SELECT * FROM users WHERE id = 1').get();
+    if (!defaultUser) {
+      this.db.prepare(`
+        INSERT INTO users (id, telegram_id, username, first_name)
+        VALUES (1, 0, 'default', 'Default User')
+      `).run();
+    }
+
     // Таблица стримеров
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS streamers (
