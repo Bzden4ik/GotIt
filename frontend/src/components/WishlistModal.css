@@ -150,43 +150,22 @@
   overflow: hidden;
 }
 
-.item-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .item-link {
-  display: block;
+  display: inline-block;
   padding: 8px 16px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: var(--radius-sm);
+  color: var(--color-accent);
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   transition: all 0.3s ease;
-  text-align: center;
 }
 
-.item-link-fetta {
-  background: var(--gradient-primary);
-  color: white;
-}
-
-.item-link-fetta:hover {
+.item-link:hover {
+  background: rgba(139, 92, 246, 0.2);
   transform: scale(1.05);
-  box-shadow: var(--shadow-glow);
-}
-
-.item-link-store {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--color-text-secondary);
-}
-
-.item-link-store:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: var(--color-text-primary);
 }
 
 .modal-footer {

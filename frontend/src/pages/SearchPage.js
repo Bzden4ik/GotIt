@@ -4,6 +4,7 @@ import apiService from '../services/api';
 import Toast from '../components/Toast';
 import DecodeText from '../components/DecodeText';
 import PageTransition from '../components/PageTransition';
+import useStaggerAnimation from '../hooks/useStaggerAnimation';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -13,6 +14,8 @@ function SearchPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  
+  const resultsRef = useStaggerAnimation('.streamer-card', 0.2);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -109,7 +112,7 @@ function SearchPage({ user }) {
         )}
 
         {searchResults.length > 0 && (
-          <div className="search-results">
+          <div className="search-results" ref={resultsRef}>
             {searchResults.map((streamer, index) => (
               <div key={index} className="streamer-card">
                 {streamer.avatar && (

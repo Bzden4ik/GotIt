@@ -1,35 +1,65 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { gsap } from 'gsap';
 import './DecodeText.css';
 
 function DecodeText({ text, className = '', delay = 0 }) {
-  const [displayText, setDisplayText] = useState('');
-  const [isAnimating, setIsAnimating] = useState(true);
+  const textRef = useRef(null);
+  const charsRef = useRef([]);
 
   useEffect(() => {
+    if (!textRef.current) return;
+
     const chars = text.split('');
-    let currentIndex = 0;
-    
-    const startDelay = setTimeout(() => {
-      const interval = setInterval(() => {
-        if (currentIndex < chars.length) {
-          setDisplayText(text.substring(0, currentIndex + 1));
-          currentIndex++;
-        } else {
-          clearInterval(interval);
-          setIsAnimating(false);
+    charsRef.current = [];
+
+    // Очищаем контейнер
+    textRef.current.innerHTML = '';
+
+    // Создаем span для каждого символа
+    chars.forEach((char, i) => {
+      const span = document.createElement('span');
+      span.className = 'decode-char';
+      span.textContent = char === ' ' ? '\u00A0' : char;
+      span.style.display = 'inline-block';
+      textRef.current.appendChild(span);
+      charsRef.current.push(span);
+    });
+
+    // Анимация появления
+    gsap.fromTo(
+      charsRef.current,
+      {
+        opacity: 0,
+        filter: 'blur(10px)',
+        y: 10,
+        scale: 0.95
+      },
+      {
+        opacity: 1,
+        filter: 'blur(0px)',
+        y: 0,
+        scale: 1,
+        duration: 0.8,
+        delay: delay,
+        stagger: {
+          amount: 0.6,
+          from: 'random'
+        },
+        ease: 'power2.out',
+        onStart: function() {
+          // Добавляем фазу "призрачной" буквы
+          gsap.to(this.targets(), {
+            opacity: 0.3,
+            duration: 0.2,
+            ease: 'none'
+          });
         }
-      }, 30);
-
-      return () => clearInterval(interval);
-    }, delay * 1000);
-
-    return () => clearTimeout(startDelay);
+      }
+    );
   }, [text, delay]);
 
   return (
-    <span className={`decode-text ${isAnimating ? 'animating' : ''} ${className}`}>
-      {displayText}
-    </span>
+    <div ref={textRef} className={`decode-text ${className}`}></div>
   );
 }
 

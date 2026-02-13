@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
 import DecodeText from '../components/DecodeText';
 import PageTransition from '../components/PageTransition';
+import useStaggerAnimation from '../hooks/useStaggerAnimation';
 import './TrackedList.css';
 
 function TrackedList({ user }) {
@@ -14,6 +15,8 @@ function TrackedList({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  
+  const gridRef = useStaggerAnimation('.streamer-card', 0.3);
 
   useEffect(() => {
     if (user) {
@@ -112,7 +115,7 @@ function TrackedList({ user }) {
               <p className="hint">Найдите стримера в разделе "Поиск" и добавьте его в отслеживаемые</p>
             </div>
           ) : (
-            <div className="streamers-grid">
+            <div className="streamers-grid" ref={gridRef}>
               {trackedStreamers.map((streamer) => (
                 <div key={streamer.id} className="streamer-card">
                   {streamer.avatar && (
