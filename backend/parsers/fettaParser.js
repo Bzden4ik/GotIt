@@ -211,11 +211,26 @@ class FettaParser {
     }
 
     let description = '';
+    // Ищем описание - span с классом содержащим "text-tertiary" (но не "text-tertiary/50")
+    // и исключаем элементы внутри footer
     const descElements = $('span').filter((i, el) => {
-      const text = $(el).text().trim();
-      const parent = $(el).parent();
-      return text.length > 20 && !text.startsWith('@') && parent.prop('tagName') === 'DIV';
+      const $el = $(el);
+      const text = $el.text().trim();
+      const className = $el.attr('class') || '';
+      const inFooter = $el.closest('footer').length > 0;
+      
+      // Проверяем:
+      // 1. Текст не пустой и не короткий
+      // 2. Есть класс text-tertiary (без /50)
+      // 3. Не в футере
+      // 4. Не юзернейм
+      return text.length > 5 && 
+             className.includes('text-tertiary') && 
+             !className.includes('text-tertiary/50') &&
+             !inFooter &&
+             !text.startsWith('@');
     });
+    
     if (descElements.length) {
       description = descElements.first().text().trim();
     }
