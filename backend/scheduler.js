@@ -1,4 +1,3 @@
-const cron = require('node-cron');
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const TelegramBot = require('./bot/telegramBot');
@@ -7,24 +6,45 @@ class Scheduler {
   constructor(botToken) {
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
+    this.intervalId = null;
   }
 
-  start(cronExpression = '*/30 * * * *') {
+  start(intervalSeconds = 5) {
     if (this.isRunning) { console.log('Планировщик уже запущен'); return; }
-    console.log(`Запуск планировщика с расписанием: ${cronExpression}`);
-    this.task = cron.schedule(cronExpression, async () => {
-      await this.checkAllStreamers();
-    });
+    console.log(`Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 23:00 МСК`);
+    
+    this.intervalId = setInterval(async () => {
+      if (this.isWithinWorkingHours()) {
+        await this.checkAllStreamers();
+      }
+    }, intervalSeconds * 1000);
+    
     this.isRunning = true;
     console.log('✓ Планировщик запущен');
     setTimeout(() => {
-      console.log('Выполняется первая проверка стримеров...');
-      this.checkAllStreamers();
+      if (this.isWithinWorkingHours()) {
+        console.log('Выполняется первая проверка стримеров...');
+        this.checkAllStreamers();
+      } else {
+        console.log('Пропуск первой проверки - вне рабочего времени');
+      }
     }, 10000);
   }
 
   stop() {
-    if (this.task) { this.task.stop(); this.isRunning = false; console.log('✓ Планировщик остановлен'); }
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      this.isRunning = false;
+      console.log('✓ Планировщик остановлен');
+    }
+  }
+
+  isWithinWorkingHours() {
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    // МСК = UTC+3, поэтому 7:00-23:00 МСК = 4:00-20:00 UTC
+    return utcHours >= 4 && utcHours < 20;
   }
 
   async checkAllStreamers() {

@@ -230,9 +230,9 @@ async function startServer() {
       console.log(`Сервер запущен на порту ${PORT}`);
 
       const scheduler = new Scheduler(BOT_TOKEN);
-      const checkInterval = process.env.CHECK_INTERVAL || '*/30 * * * *';
+      const checkInterval = parseInt(process.env.CHECK_INTERVAL) || 5;
       scheduler.start(checkInterval);
-      console.log(`Планировщик настроен на: ${checkInterval}`);
+      console.log(`Планировщик настроен на проверку каждые ${checkInterval} секунд`);
     });
   } catch (error) {
     console.error('Ошибка запуска сервера:', error);
