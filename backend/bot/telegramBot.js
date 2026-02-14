@@ -1,10 +1,15 @@
 const axios = require('axios');
 const db = require('../database/database');
+const AIAssistant = require('./aiAssistant');
 
 class TelegramBot {
   constructor(token) {
     this.token = token;
     this.apiUrl = `https://api.telegram.org/bot${token}`;
+    this.ai = new AIAssistant();
+    
+    // Очищаем старые лимиты каждый день
+    setInterval(() => this.ai.cleanOldLimits(), 24 * 60 * 60 * 1000);
   }
 
   /**
@@ -415,16 +420,24 @@ class TelegramBot {
     try {
       // Команды
       if (update.message && update.message.text) {
-        if (update.message.text.startsWith('/start')) {
+        const text = update.message.text;
+        
+        if (text.startsWith('/start')) {
           await this.handleStartCommand(update.message);
           return;
         }
-        if (update.message.text.startsWith('/settings')) {
+        if (text.startsWith('/settings')) {
           await this.handleSettingsCommand(update.message);
           return;
         }
-        if (update.message.text.startsWith('/groups')) {
+        if (text.startsWith('/groups')) {
           await this.handleGroupsCommand(update.message);
+          return;
+        }
+        
+        // Обычные сообщения - отправляем в AI
+        if (!text.startsWith('/')) {
+          await this.handleAIMessage(update.message);
           return;
         }
       }
@@ -442,6 +455,51 @@ class TelegramBot {
       }
     } catch (error) {
       console.error('Ошибка обработки обновления:', error);
+    }
+  }
+
+  /**
+   * Обработка AI сообщений
+   */
+  async handleAIMessage(message) {
+    const chatId = message.chat.id;
+    const userId = message.from.id;
+    const text = message.text;
+
+    // В группах не отвечаем (только команды)
+    if (message.chat.type !== 'private') {
+      return;
+    }
+
+    try {
+      // Показываем что печатаем
+      await axios.post(`${this.apiUrl}/sendChatAction`, {
+        chat_id: chatId,
+        action: 'typing'
+      });
+
+      const response = await this.ai.getResponse(text, userId);
+
+      if (!response) {
+        await this.sendMessage(chatId, 'Сэмпай, у меня технические проблемы 😔 Попробуй команды: /start, /settings, /groups');
+        return;
+      }
+
+      if (response.limitExceeded) {
+        await this.sendMessage(chatId, response.text);
+        return;
+      }
+
+      // Добавляем информацию об оставшихся сообщениях (только если меньше 5)
+      let messageText = response.text;
+      if (response.remaining <= 5 && response.remaining > 0) {
+        messageText += `\n\n<i>(AI сообщений осталось сегодня: ${response.remaining})</i>`;
+      }
+
+      await this.sendMessage(chatId, messageText, { parse_mode: 'HTML' });
+    } catch (error) {
+      console.error('Ошибка AI обработки:', error);
+      await this.sendMessage(chatId, 'Извини, Сэмпай, что-то пошло не так 😔');
     }
   }
 
