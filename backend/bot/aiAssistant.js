@@ -157,7 +157,12 @@ class AIAssistant {
         }
         
         systemPrompt += '\n=== КОНЕЦ ДАННЫХ ===\n';
-        systemPrompt += '\nИСПОЛЬЗУЙ ЭТИ ДАННЫЕ чтобы давать точные рекомендации!\n';
+        systemPrompt += '\nИСПОЛЬЗУЙ ЭТИ ДАННЫЕ чтобы давать точные рекомендации!\n\n';
+        systemPrompt += 'ВАЖНО - КАК ПОНИМАТЬ ЗАПРОСЫ:\n';
+        systemPrompt += '• "Что купить ДЛЯ strimera X" = показать товары ИЗ ВИШЛИСТА strimera X\n';
+        systemPrompt += '• "У меня 1000₽" = показать товары ПОД БЮДЖЕТ из любых стримеров\n';
+        systemPrompt += '• Если вишлист пуст - предложи товары из других стримеров (которые есть у пользователя)\n';
+        systemPrompt += '• НЕ пиши фразы типа "подойдет для strimera" - пиши "купить strimeru" или "подарить strimeru"\n';
       }
 
       const response = await axios.post(

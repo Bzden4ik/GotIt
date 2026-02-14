@@ -5,13 +5,16 @@ require('dotenv').config();
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const Scheduler = require('./scheduler');
+const { errorHandler, rateLimit, asyncHandler } = require('./middleware/security');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
+// Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // Ограничение размера body
+app.use(rateLimit({ maxRequests: 100, windowMs: 60 * 1000 })); // 100 запросов в минуту
 
 function verifyTelegramAuth(data) {
   if (!BOT_TOKEN) {
@@ -276,6 +279,9 @@ app.post('/webhook/telegram', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// === Обработчик ошибок (должен быть последним!) ===
+app.use(errorHandler);
 
 // === Запуск ===
 async function startServer() {
