@@ -19,8 +19,7 @@ class Scheduler {
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
     this.intervalId = null;
-    this.lastNotifications = new Map(); // streamerId -> timestamp
-    this.notificationCooldown = 60 * 1000; // 1 минута между уведомлениями для одного стримера
+    this.lastNotifications = new Map(); // Для будущего использования
     
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
     
@@ -33,7 +32,7 @@ class Scheduler {
       return; 
     }
     
-    console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 23:00 МСК`);
+    console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 3:00 МСК (ночью)`);
     
     this.intervalId = setInterval(async () => {
       if (this.isWithinWorkingHours()) {
@@ -64,20 +63,14 @@ class Scheduler {
     }
   }
 
-  stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-      this.isRunning = false;
-      console.log('✓ Планировщик остановлен');
-    }
-  }
-
   isWithinWorkingHours() {
     const now = new Date();
     const utcHours = now.getUTCHours();
-    // МСК = UTC+3, поэтому 7:00-23:00 МСК = 4:00-20:00 UTC
-    return utcHours >= 4 && utcHours < 20;
+    // МСК = UTC+3
+    // 7:00 МСК = 4:00 UTC
+    // 3:00 МСК = 0:00 UTC (следующего дня)
+    // Работаем: 4:00-23:59 UTC и 0:00-0:59 UTC (то есть 7:00-3:00 МСК)
+    return utcHours >= 4 || utcHours < 1;
   }
 
   async checkAllStreamers() {
@@ -165,13 +158,10 @@ class Scheduler {
           console.log(`    ${i + 1}. ${item.name?.substring(0, 60)} - ${item.price}`);
         });
         
-        // Проверяем кулдаун - не отправляли ли мы уведомление недавно
-        const lastNotification = this.lastNotifications.get(streamer.id);
-        const now = Date.now();
-        
-        if (lastNotification && (now - lastNotification) < this.notificationCooldown) {
-          const remainingSeconds = Math.ceil((this.notificationCooldown - (now - lastNotification)) / 1000);
-          console.log(`  ⏳ Кулдаун активен, пропускаем уведомления (${remainingSeconds} сек)`);
+        // Защита: если база была пустая и товаров много - это первая синхронизация после миграции
+        if (existingItems.length === 0 && currentItems.length > 2) {
+          console.log(`  ⚠ База пустая, но товаров много (${currentItems.length}), пропускаем уведомления`);
+          console.log(`  Вероятно это первая синхронизация после миграции или деплоя`);
         } else {
           // Получаем подписчиков стримера
           const followers = await db.getStreamerFollowers(streamer.id);
@@ -189,9 +179,7 @@ class Scheduler {
             await this.sendNotificationToGroup(group, streamer, newItems);
           }
           
-          // Запоминаем время отправки
-          this.lastNotifications.set(streamer.id, now);
-          console.log(`  ✓ Уведомления отправлены, кулдаун на 1 минуту`);
+          console.log(`  ✓ Уведомления отправлены`);
         }
       } else {
         console.log(`  ✓ Новых товаров нет`);

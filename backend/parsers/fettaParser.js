@@ -372,16 +372,25 @@ class FettaParser {
       console.log(`Получено категорий: ${categories.length}`);
       
       // Преобразуем формат API в наш формат
-      const wishlist = apiProducts.map(product => ({
-        id: product.id,
-        image: product.imageUrl,
-        price: product.price ? `${product.price} ₽` : '',
-        priceRaw: product.price || 0,
-        name: product.name,
-        productUrl: product.externalId ? `https://www.ozon.ru/product/${product.externalId}` : '',
-        isPinned: product.isPinned || false,
-        isUnavailable: product.isUnavailable || false
-      }));
+      const wishlist = apiProducts.map(product => {
+        // Добавляем +8% к цене и округляем вверх
+        let finalPrice = product.price || 0;
+        if (finalPrice > 0) {
+          finalPrice = Math.ceil(finalPrice * 1.08); // +8% и округление вверх
+        }
+        
+        return {
+          id: product.id, // product_id из API
+          externalId: product.externalId, // external_id из API
+          image: product.imageUrl,
+          price: finalPrice > 0 ? `${finalPrice} ₽` : '',
+          priceRaw: finalPrice,
+          name: product.name,
+          productUrl: product.externalId ? `https://www.ozon.ru/product/${product.externalId}` : '',
+          isPinned: product.isPinned || false,
+          isUnavailable: product.isUnavailable || false
+        };
+      });
       
       return {
         success: true,

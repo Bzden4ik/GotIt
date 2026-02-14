@@ -45,13 +45,15 @@ class DatabaseService {
       `CREATE TABLE IF NOT EXISTS wishlist_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         streamer_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        external_id TEXT,
         image TEXT,
         price TEXT,
         name TEXT,
         product_url TEXT,
-        item_hash TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+        UNIQUE(streamer_id, product_id)
       )`,
       `CREATE TABLE IF NOT EXISTS groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -243,21 +245,20 @@ class DatabaseService {
   async saveWishlistItems(streamerId, items) {
     // Получаем текущие товары из базы
     const existingItems = await this.getWishlistItems(streamerId);
-    const existingHashes = new Map(existingItems.map(i => [i.item_hash, i]));
+    const existingIds = new Map(existingItems.map(i => [i.product_id, i]));
     
-    // Генерируем хеши для новых товаров
+    // Создаём Map новых товаров по product_id
     const newItemsMap = new Map();
     for (const item of items) {
-      const hash = this.generateItemHash(item);
-      newItemsMap.set(hash, item);
+      newItemsMap.set(item.id, item);
     }
     
     const stmts = [];
     
     // Удаляем товары, которых больше нет
     const toDelete = [];
-    for (const [hash, item] of existingHashes) {
-      if (!newItemsMap.has(hash)) {
+    for (const [productId, item] of existingIds) {
+      if (!newItemsMap.has(productId)) {
         toDelete.push(item.id);
       }
     }
@@ -273,18 +274,18 @@ class DatabaseService {
     
     // Добавляем только новые товары
     const toAdd = [];
-    for (const [hash, item] of newItemsMap) {
-      if (!existingHashes.has(hash)) {
-        toAdd.push({ hash, item });
+    for (const [productId, item] of newItemsMap) {
+      if (!existingIds.has(productId)) {
+        toAdd.push({ productId, item });
       }
     }
     
     if (toAdd.length > 0) {
-      for (const { hash, item } of toAdd) {
+      for (const { productId, item } of toAdd) {
         stmts.push({
-          sql: `INSERT INTO wishlist_items (streamer_id, image, price, name, product_url, item_hash)
-                VALUES (?, ?, ?, ?, ?, ?)`,
-          args: [streamerId, item.image, item.price, item.name, item.productUrl, hash]
+          sql: `INSERT INTO wishlist_items (streamer_id, product_id, external_id, image, price, name, product_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          args: [streamerId, item.id, item.externalId, item.image, item.price, item.name, item.productUrl]
         });
       }
     }
@@ -308,11 +309,25 @@ class DatabaseService {
 
   async getNewWishlistItems(streamerId, items) {
     const current = await this.getWishlistItems(streamerId);
-    const hashes = new Set(current.map(i => i.item_hash));
-    return items.filter(item => !hashes.has(this.generateItemHash(item)));
+    
+    // Создаём Set из product_id И external_id для надёжной проверки
+    const existingProductIds = new Set(current.map(i => i.product_id));
+    const existingExternalIds = new Set(current.filter(i => i.external_id).map(i => i.external_id));
+    
+    return items.filter(item => {
+      // Товар новый если:
+      // 1. Нет ни product_id, ни external_id в базе
+      // 2. Или есть только один из них (частичное совпадение игнорируем)
+      const hasProductId = existingProductIds.has(item.id);
+      const hasExternalId = item.externalId && existingExternalIds.has(item.externalId);
+      
+      // Новый = оба ID отсутствуют
+      return !hasProductId && !hasExternalId;
+    });
   }
 
   generateItemHash(item) {
+    // Старый метод, оставлен для совместимости
     const str = `${item.name || ''}_${item.price || ''}_${item.image || ''}`;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
