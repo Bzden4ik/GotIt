@@ -95,8 +95,8 @@ class TelegramBot {
   /**
    * Показать меню настроек
    */
-  async sendSettingsMenu(chatId, userId) {
-    const user = await db.getUserById(userId);
+  async sendSettingsMenu(chatId, telegramId) {
+    const user = await db.getUserByTelegramId(telegramId);
     if (!user) {
       return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
     }
@@ -134,8 +134,8 @@ class TelegramBot {
   /**
    * Показать меню групп
    */
-  async sendGroupsMenu(chatId, userId) {
-    const user = await db.getUserById(userId);
+  async sendGroupsMenu(chatId, telegramId) {
+    const user = await db.getUserByTelegramId(telegramId);
     if (!user) {
       return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
     }
@@ -165,8 +165,8 @@ class TelegramBot {
   /**
    * Показать стримеров для группы
    */
-  async sendGroupStreamersMenu(chatId, userId, groupId, messageId = null) {
-    const user = await db.getUserById(userId);
+  async sendGroupStreamersMenu(chatId, telegramId, groupId, messageId = null) {
+    const user = await db.getUserByTelegramId(telegramId);
     if (!user) return;
 
     // groupId это ID из базы, не chat_id
@@ -268,8 +268,8 @@ class TelegramBot {
    */
   async handleSettingsCommand(message) {
     const chatId = message.chat.id;
-    const userId = message.from.id;
-    await this.sendSettingsMenu(chatId, userId);
+    const telegramId = message.from.id;
+    await this.sendSettingsMenu(chatId, telegramId);
   }
 
   /**
@@ -277,8 +277,8 @@ class TelegramBot {
    */
   async handleGroupsCommand(message) {
     const chatId = message.chat.id;
-    const userId = message.from.id;
-    await this.sendGroupsMenu(chatId, userId);
+    const telegramId = message.from.id;
+    await this.sendGroupsMenu(chatId, telegramId);
   }
 
   /**
@@ -288,9 +288,9 @@ class TelegramBot {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
     const messageId = callbackQuery.message.message_id;
-    const userId = callbackQuery.from.id;
+    const telegramId = callbackQuery.from.id;
 
-    const user = await db.getUserByTelegramId(userId);
+    const user = await db.getUserByTelegramId(telegramId);
     if (!user) {
       return await this.answerCallbackQuery(callbackQuery.id, 'Сначала авторизуйся на сайте!', true);
     }
@@ -307,14 +307,14 @@ class TelegramBot {
       });
 
       await this.answerCallbackQuery(callbackQuery.id, newState ? '🔔 Включено' : '🔕 Выключено');
-      await this.sendSettingsMenu(chatId, user.id);
+      await this.sendSettingsMenu(chatId, telegramId);
       return;
     }
 
     // Выбор группы
     if (data.startsWith('group_')) {
       const groupId = parseInt(data.replace('group_', ''));
-      await this.sendGroupStreamersMenu(chatId, user.id, groupId, messageId);
+      await this.sendGroupStreamersMenu(chatId, telegramId, groupId, messageId);
       await this.answerCallbackQuery(callbackQuery.id);
       return;
     }
@@ -330,13 +330,13 @@ class TelegramBot {
 
       await db.updateGroupStreamerSettings(groupId, streamerId, newState);
       await this.answerCallbackQuery(callbackQuery.id, newState ? '✅ Включено' : '❌ Выключено');
-      await this.sendGroupStreamersMenu(chatId, user.id, groupId, messageId);
+      await this.sendGroupStreamersMenu(chatId, telegramId, groupId, messageId);
       return;
     }
 
     // Назад к группам
     if (data === 'back_to_groups') {
-      await this.sendGroupsMenu(chatId, user.id);
+      await this.sendGroupsMenu(chatId, telegramId);
       await this.answerCallbackQuery(callbackQuery.id);
       return;
     }
