@@ -7,6 +7,8 @@ class Scheduler {
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
     this.intervalId = null;
+    this.lastNotifications = new Map(); // streamerId -> timestamp
+    this.notificationCooldown = 60 * 1000; // 1 минута между уведомлениями для одного стримера
   }
 
   start(intervalSeconds = 5) {
@@ -78,21 +80,42 @@ class Scheduler {
       // Проверяем что есть в базе
       const existingItems = await db.getWishlistItems(streamer.id);
       console.log(`  В базе сохранено товаров: ${existingItems.length}`);
+      
+      // Логируем хеши из базы для отладки
+      if (existingItems.length > 0 && existingItems.length <= 10) {
+        console.log(`  Хеши в базе:`);
+        existingItems.forEach((item, i) => {
+          console.log(`    ${i + 1}. ${item.name?.substring(0, 50)} - ${item.price} (hash: ${item.item_hash})`);
+        });
+      }
 
       const newItems = await db.getNewWishlistItems(streamer.id, currentItems);
       console.log(`  Определено новых товаров: ${newItems.length}`);
 
       if (newItems.length > 0) {
-        console.log(`  🎁 Новые товары:`);
+        console.log(`  🎁 Найдено новых товаров: ${newItems.length}`);
+        
+        // Детальное логирование для отладки
+        console.log(`  Новые товары - генерация хешей:`);
         newItems.forEach((item, i) => {
-          const hash = db.generateItemHash(item);
-          console.log(`    ${i + 1}. ${item.name?.substring(0, 50) || 'Без названия'} (hash: ${hash})`);
+          db.generateItemHashDebug(item, `NEW #${i + 1}`);
         });
         
-        // Защита от спама: если слишком много новых товаров одновременно - возможно база была очищена
-        if (newItems.length > 15) {
-          console.log(`  ⚠ Слишком много новых товаров (${newItems.length}), пропускаем уведомления`);
-          console.log(`  Вероятно это после очистки базы или первый запуск`);
+        // Для сравнения покажем что в базе
+        if (existingItems.length > 0 && existingItems.length <= 5) {
+          console.log(`  Существующие товары в базе:`);
+          existingItems.forEach((item, i) => {
+            console.log(`    ${i + 1}. "${item.name?.substring(0, 30)}..." hash: ${item.item_hash}`);
+          });
+        }
+        
+        // Проверяем кулдаун - не отправляли ли мы уведомление недавно
+        const lastNotification = this.lastNotifications.get(streamer.id);
+        const now = Date.now();
+        
+        if (lastNotification && (now - lastNotification) < this.notificationCooldown) {
+          const remainingSeconds = Math.ceil((this.notificationCooldown - (now - lastNotification)) / 1000);
+          console.log(`  ⏳ Кулдаун активен, пропускаем уведомления (${remainingSeconds} сек)`);
         } else {
           // Получаем подписчиков стримера
           const followers = await db.getStreamerFollowers(streamer.id);
@@ -109,6 +132,10 @@ class Scheduler {
           for (const group of groups) {
             await this.sendNotificationToGroup(group, streamer, newItems);
           }
+          
+          // Запоминаем время отправки
+          this.lastNotifications.set(streamer.id, now);
+          console.log(`  ✓ Уведомления отправлены, кулдаун на 1 минуту`);
         }
       } else {
         console.log(`  ✓ Новых товаров нет`);

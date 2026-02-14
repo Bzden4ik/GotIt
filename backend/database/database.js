@@ -325,6 +325,29 @@ class DatabaseService {
     return hash.toString();
   }
 
+  // Для отладки - генерация хеша с логированием
+  generateItemHashDebug(item, label = '') {
+    const name = item.name || '';
+    const price = item.price || '';
+    const image = item.image || '';
+    const str = `${name}_${price}_${image}`;
+    
+    console.log(`  [DEBUG ${label}] Hash для: "${name.substring(0, 30)}..."`);
+    console.log(`    price: "${price}"`);
+    console.log(`    image: "${image.substring(0, 50)}..."`);
+    console.log(`    string: "${str.substring(0, 100)}..."`);
+    
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + c;
+      hash = hash & hash;
+    }
+    
+    console.log(`    hash: ${hash.toString()}`);
+    return hash.toString();
+  }
+
   // ── Планировщик ──
 
   async getAllTrackedStreamers() {
