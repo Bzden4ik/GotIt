@@ -12,6 +12,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 function verifyTelegramAuth(data) {
   if (!BOT_TOKEN) {
@@ -215,6 +216,20 @@ app.post('/api/test/notify', async (req, res) => {
   try {
     await bot.sendMessage(telegramId, '✅ Тестовое уведомление от GotIt!');
     res.json({ success: true, message: 'Уведомление отправлено' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/test/notify/:telegramId', async (req, res) => {
+  const { telegramId } = req.params;
+  if (!telegramId) return res.status(400).json({ success: false, error: 'Укажите telegramId в URL' });
+  if (!BOT_TOKEN) return res.status(500).json({ success: false, error: 'TELEGRAM_BOT_TOKEN не настроен' });
+  const TelegramBot = require('./bot/telegramBot');
+  const bot = new TelegramBot(BOT_TOKEN);
+  try {
+    await bot.sendMessage(telegramId, '✅ Тестовое уведомление от GotIt!');
+    res.json({ success: true, message: 'Уведомление отправлено на Telegram ID: ' + telegramId });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
