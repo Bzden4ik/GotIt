@@ -53,9 +53,49 @@ class DatabaseService {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
       )`,
+      `CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER UNIQUE NOT NULL,
+        title TEXT,
+        added_by_user_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (added_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS user_streamer_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        streamer_id INTEGER NOT NULL,
+        notifications_enabled INTEGER DEFAULT 1,
+        notify_in_pm INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+        UNIQUE(user_id, streamer_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS group_streamer_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        streamer_id INTEGER NOT NULL,
+        enabled INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+        UNIQUE(group_id, streamer_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS user_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        group_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+        UNIQUE(user_id, group_id)
+      )`,
       `CREATE INDEX IF NOT EXISTS idx_user_streamers_user ON user_streamers(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_user_streamers_streamer ON user_streamers(streamer_id)`,
-      `CREATE INDEX IF NOT EXISTS idx_wishlist_streamer ON wishlist_items(streamer_id)`
+      `CREATE INDEX IF NOT EXISTS idx_wishlist_streamer ON wishlist_items(streamer_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_user_groups_user ON user_groups(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_user_groups_group ON user_groups(group_id)`
     ], 'write');
 
     console.log('✅ База данных инициализирована');
@@ -216,6 +256,89 @@ class DatabaseService {
       sql: `SELECT u.* FROM users u
             JOIN user_streamers us ON u.id = us.user_id
             WHERE us.streamer_id = ?`,
+      args: [streamerId]
+    });
+    return rs.rows;
+  }
+
+  // ── Группы ──
+
+  async createGroup(chatId, title, addedByUserId) {
+    await this.db.execute({
+      sql: `INSERT OR IGNORE INTO groups (chat_id, title, added_by_user_id) VALUES (?, ?, ?)`,
+      args: [chatId, title, addedByUserId]
+    });
+    return this.getGroupByChatId(chatId);
+  }
+
+  async getGroupByChatId(chatId) {
+    const rs = await this.db.execute({
+      sql: 'SELECT * FROM groups WHERE chat_id = ?',
+      args: [chatId]
+    });
+    return rs.rows[0] || null;
+  }
+
+  async linkUserToGroup(userId, groupId) {
+    await this.db.execute({
+      sql: 'INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)',
+      args: [userId, groupId]
+    });
+  }
+
+  async getUserGroups(userId) {
+    const rs = await this.db.execute({
+      sql: `SELECT g.* FROM groups g
+            JOIN user_groups ug ON g.id = ug.group_id
+            WHERE ug.user_id = ?`,
+      args: [userId]
+    });
+    return rs.rows;
+  }
+
+  // ── Настройки уведомлений ──
+
+  async getStreamerSettings(userId, streamerId) {
+    const rs = await this.db.execute({
+      sql: 'SELECT * FROM user_streamer_settings WHERE user_id = ? AND streamer_id = ?',
+      args: [userId, streamerId]
+    });
+    return rs.rows[0] || { notifications_enabled: 1, notify_in_pm: 1 };
+  }
+
+  async updateStreamerSettings(userId, streamerId, settings) {
+    await this.db.execute({
+      sql: `INSERT INTO user_streamer_settings (user_id, streamer_id, notifications_enabled, notify_in_pm)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, streamer_id) DO UPDATE SET
+              notifications_enabled = excluded.notifications_enabled,
+              notify_in_pm = excluded.notify_in_pm`,
+      args: [userId, streamerId, settings.notifications_enabled, settings.notify_in_pm]
+    });
+  }
+
+  async getGroupStreamerSettings(groupId, streamerId) {
+    const rs = await this.db.execute({
+      sql: 'SELECT * FROM group_streamer_settings WHERE group_id = ? AND streamer_id = ?',
+      args: [groupId, streamerId]
+    });
+    return rs.rows[0] || { enabled: 0 };
+  }
+
+  async updateGroupStreamerSettings(groupId, streamerId, enabled) {
+    await this.db.execute({
+      sql: `INSERT INTO group_streamer_settings (group_id, streamer_id, enabled)
+            VALUES (?, ?, ?)
+            ON CONFLICT(group_id, streamer_id) DO UPDATE SET enabled = excluded.enabled`,
+      args: [groupId, streamerId, enabled ? 1 : 0]
+    });
+  }
+
+  async getGroupsForStreamerNotifications(streamerId) {
+    const rs = await this.db.execute({
+      sql: `SELECT g.* FROM groups g
+            JOIN group_streamer_settings gss ON g.id = gss.group_id
+            WHERE gss.streamer_id = ? AND gss.enabled = 1`,
       args: [streamerId]
     });
     return rs.rows;

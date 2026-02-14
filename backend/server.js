@@ -193,14 +193,110 @@ app.get('/api/streamer/:id/wishlist', async (req, res) => {
   }
 });
 
+// === Настройки уведомлений ===
+
+// Получить настройки уведомлений для стримера
+app.get('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
+  const { userId, streamerId } = req.params;
+  try {
+    const settings = await db.getStreamerSettings(parseInt(userId), parseInt(streamerId));
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('Ошибка получения настроек:', error);
+    res.status(500).json({ success: false, error: 'Ошибка получения настроек' });
+  }
+});
+
+// Обновить настройки уведомлений для стримера
+app.put('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
+  const { userId, streamerId } = req.params;
+  const { notifications_enabled, notify_in_pm } = req.body;
+  try {
+    await db.updateStreamerSettings(parseInt(userId), parseInt(streamerId), {
+      notifications_enabled: notifications_enabled ? 1 : 0,
+      notify_in_pm: notify_in_pm ? 1 : 0
+    });
+    res.json({ success: true, message: 'Настройки обновлены' });
+  } catch (error) {
+    console.error('Ошибка обновления настроек:', error);
+    res.status(500).json({ success: false, error: 'Ошибка обновления настроек' });
+  }
+});
+
+// Получить группы пользователя
+app.get('/api/user/:userId/groups', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const groups = await db.getUserGroups(parseInt(userId));
+    res.json({ success: true, groups });
+  } catch (error) {
+    console.error('Ошибка получения групп:', error);
+    res.status(500).json({ success: false, error: 'Ошибка получения групп' });
+  }
+});
+
+// Получить настройки группы для стримера
+app.get('/api/group/:groupId/streamer/:streamerId/settings', async (req, res) => {
+  const { groupId, streamerId } = req.params;
+  try {
+    const settings = await db.getGroupStreamerSettings(parseInt(groupId), parseInt(streamerId));
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('Ошибка получения настроек группы:', error);
+    res.status(500).json({ success: false, error: 'Ошибка получения настроек группы' });
+  }
+});
+
+// Обновить настройки группы для стримера
+app.put('/api/group/:groupId/streamer/:streamerId/settings', async (req, res) => {
+  const { groupId, streamerId } = req.params;
+  const { enabled } = req.body;
+  try {
+    await db.updateGroupStreamerSettings(parseInt(groupId), parseInt(streamerId), enabled);
+    res.json({ success: true, message: 'Настройки группы обновлены' });
+  } catch (error) {
+    console.error('Ошибка обновления настроек группы:', error);
+    res.status(500).json({ success: false, error: 'Ошибка обновления настроек группы' });
+  }
+});
+
+// === Telegram Webhook ===
+app.post('/webhook/telegram', async (req, res) => {
+  try {
+    const update = req.body;
+    if (!BOT_TOKEN) {
+      return res.status(500).json({ error: 'Бот не настроен' });
+    }
+    const TelegramBot = require('./bot/telegramBot');
+    const bot = new TelegramBot(BOT_TOKEN);
+    await bot.handleUpdate(update);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Ошибка обработки webhook:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === Запуск ===
 async function startServer() {
   try {
     // Инициализируем БД (создаём таблицы)
     await db.init();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
       console.log(`Сервер запущен на порту ${PORT}`);
+
+      // Устанавливаем webhook для бота если есть URL
+      if (BOT_TOKEN && process.env.WEBHOOK_URL) {
+        const TelegramBot = require('./bot/telegramBot');
+        const bot = new TelegramBot(BOT_TOKEN);
+        try {
+          await bot.setWebhook(`${process.env.WEBHOOK_URL}/webhook/telegram`);
+          console.log('✅ Webhook установлен');
+        } catch (error) {
+          console.error('❌ Ошибка установки webhook:', error.message);
+        }
+      }
 
       const scheduler = new Scheduler(BOT_TOKEN);
       const checkInterval = parseInt(process.env.CHECK_INTERVAL) || 5;

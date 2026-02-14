@@ -79,10 +79,21 @@ class Scheduler {
 
       if (newItems.length > 0) {
         console.log(`  🎁 Найдено новых товаров: ${newItems.length}`);
+        
+        // Получаем подписчиков стримера
         const followers = await db.getStreamerFollowers(streamer.id);
         console.log(`  Отправка уведомлений для ${followers.length} пользователей`);
+        
+        // Отправляем в личку пользователям
         for (const follower of followers) {
-          await this.sendNotification(follower, streamer, newItems);
+          await this.sendNotificationToUser(follower, streamer, newItems);
+        }
+
+        // Отправляем в группы
+        const groups = await db.getGroupsForStreamerNotifications(streamer.id);
+        console.log(`  Отправка в ${groups.length} групп`);
+        for (const group of groups) {
+          await this.sendNotificationToGroup(group, streamer, newItems);
         }
       } else {
         console.log(`  ✓ Новых товаров нет`);
@@ -95,14 +106,51 @@ class Scheduler {
     }
   }
 
-  async sendNotification(user, streamer, newItems) {
+  async sendNotificationToUser(user, streamer, newItems) {
     if (!this.bot) { console.log('  ⚠ Бот не настроен'); return; }
     if (!user.telegram_id) { console.log(`  ⚠ Нет telegram_id у ${user.username}`); return; }
+    
     try {
-      await this.bot.sendNewItemsNotification(user.telegram_id, streamer.name || streamer.nickname, streamer.fetta_url, newItems);
+      // Проверяем настройки пользователя
+      const settings = await db.getStreamerSettings(user.id, streamer.id);
+      
+      if (!settings.notifications_enabled) {
+        console.log(`  ⊘ Уведомления отключены для @${user.username}`);
+        return;
+      }
+
+      if (!settings.notify_in_pm) {
+        console.log(`  ⊘ ЛС отключены для @${user.username}`);
+        return;
+      }
+
+      await this.bot.sendNewItemsNotification(
+        user.telegram_id,
+        streamer.name || streamer.nickname,
+        streamer.fetta_url,
+        newItems,
+        true // isSenpai = true для личных сообщений
+      );
       console.log(`  ✓ Уведомление отправлено: @${user.username}`);
     } catch (error) {
       console.error(`  ✗ Ошибка уведомления @${user.username}:`, error.message);
+    }
+  }
+
+  async sendNotificationToGroup(group, streamer, newItems) {
+    if (!this.bot) return;
+    
+    try {
+      await this.bot.sendNewItemsNotification(
+        group.chat_id,
+        streamer.name || streamer.nickname,
+        streamer.fetta_url,
+        newItems,
+        false // isSenpai = false для групп
+      );
+      console.log(`  ✓ Уведомление отправлено в группу: ${group.title}`);
+    } catch (error) {
+      console.error(`  ✗ Ошибка уведомления в группу ${group.title}:`, error.message);
     }
   }
 
