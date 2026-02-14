@@ -373,6 +373,12 @@ class FettaParser {
       
       // Преобразуем формат API в наш формат
       const wishlist = apiProducts.map(product => {
+        // Валидация product ID
+        if (!product.id) {
+          console.log(`  ⚠ Товар без ID: ${product.name}`);
+          return null;
+        }
+        
         // Добавляем +8% к цене и округляем вверх
         let finalPrice = product.price || 0;
         if (finalPrice > 0) {
@@ -380,17 +386,17 @@ class FettaParser {
         }
         
         return {
-          id: product.id, // product_id из API
-          externalId: product.externalId, // external_id из API
-          image: product.imageUrl,
+          id: String(product.id), // Принудительно string
+          externalId: product.externalId ? String(product.externalId) : null,
+          image: product.imageUrl || '',
           price: finalPrice > 0 ? `${finalPrice} ₽` : '',
           priceRaw: finalPrice,
-          name: product.name,
+          name: product.name || 'Без названия',
           productUrl: product.externalId ? `https://www.ozon.ru/product/${product.externalId}` : '',
           isPinned: product.isPinned || false,
           isUnavailable: product.isUnavailable || false
         };
-      });
+      }).filter(item => item !== null); // Убираем null значения
       
       return {
         success: true,

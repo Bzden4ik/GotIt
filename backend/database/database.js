@@ -243,13 +243,25 @@ class DatabaseService {
   // ── Вишлист ──
 
   async saveWishlistItems(streamerId, items) {
+    // Валидация streamerId
+    if (!streamerId || isNaN(streamerId)) {
+      console.error(`  ❌ Неверный streamerId: ${streamerId}`);
+      return;
+    }
+    
     // Получаем текущие товары из базы
     const existingItems = await this.getWishlistItems(streamerId);
     const existingIds = new Map(existingItems.map(i => [i.product_id, i]));
     
-    // Создаём Map новых товаров по product_id
+    // Создаём Map новых товаров по product_id с валидацией
     const newItemsMap = new Map();
     for (const item of items) {
+      // Валидация: пропускаем товары без ID
+      if (!item.id || typeof item.id !== 'string') {
+        console.log(`  ⚠ Пропущен товар без ID: ${item.name}`);
+        continue;
+      }
+      
       newItemsMap.set(item.id, item);
     }
     
@@ -282,18 +294,49 @@ class DatabaseService {
     
     if (toAdd.length > 0) {
       for (const { productId, item } of toAdd) {
-        stmts.push({
-          sql: `INSERT INTO wishlist_items (streamer_id, product_id, external_id, image, price, name, product_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          args: [streamerId, item.id, item.externalId, item.image, item.price, item.name, item.productUrl]
-        });
+        // Дополнительная валидация перед записью
+        const safeExternalId = item.externalId ? String(item.externalId) : null;
+        const safeImage = item.image ? String(item.image).substring(0, 500) : ''; // Ограничение длины
+        const safePrice = item.price ? String(item.price).substring(0, 50) : '';
+        const safeName = item.name ? String(item.name).substring(0, 500) : '';
+        const safeUrl = item.productUrl ? String(item.productUrl).substring(0, 500) : '';
+        
+        try {
+          stmts.push({
+            sql: `INSERT INTO wishlist_items (streamer_id, product_id, external_id, image, price, name, product_url)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            args: [streamerId, String(productId), safeExternalId, safeImage, safePrice, safeName, safeUrl]
+          });
+        } catch (error) {
+          console.error(`  ⚠ Ошибка подготовки товара "${safeName}":`, error.message);
+          console.error(`  Данные: id=${productId}, external=${safeExternalId}, price=${safePrice}`);
+        }
       }
     }
     
     // Выполняем только если есть изменения
     if (stmts.length > 0) {
-      await this.db.batch(stmts, 'write');
-      console.log(`  ✓ База обновлена: +${toAdd.length} новых, -${toDelete.length} удалённых (writes: ${stmts.length})`);
+      try {
+        await this.db.batch(stmts, 'write');
+        console.log(`  ✓ База обновлена: +${toAdd.length} новых, -${toDelete.length} удалённых (writes: ${stmts.length})`);
+      } catch (error) {
+        console.error(`  ❌ Ошибка записи в базу:`, error.message);
+        
+        // Пробуем записывать по одному чтобы найти проблемный товар
+        console.log(`  Пытаемся записать товары по одному...`);
+        let successCount = 0;
+        for (let i = 0; i < stmts.length; i++) {
+          try {
+            await this.db.execute(stmts[i]);
+            successCount++;
+          } catch (itemError) {
+            console.error(`  ❌ Проблемный товар #${i + 1}:`, itemError.message);
+            console.error(`  SQL:`, stmts[i].sql);
+            console.error(`  Args:`, stmts[i].args);
+          }
+        }
+        console.log(`  Записано успешно: ${successCount} из ${stmts.length}`);
+      }
     } else {
       console.log(`  ✓ Изменений нет (writes: 0)`);
     }
