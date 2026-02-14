@@ -523,9 +523,9 @@ class TelegramBot {
         return;
       }
 
-      // Добавляем информацию об оставшихся сообщениях (только если меньше 5)
+      // Добавляем информацию об оставшихся сообщениях (только если меньше 10)
       let messageText = response.text;
-      if (response.remaining <= 5 && response.remaining > 0) {
+      if (response.remaining <= 10 && response.remaining > 0) {
         messageText += `\n\n<i>(AI сообщений осталось сегодня: ${response.remaining})</i>`;
       }
 
