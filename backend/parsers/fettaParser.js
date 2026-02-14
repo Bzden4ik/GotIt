@@ -140,6 +140,7 @@ class FettaParser {
   async getWishlistFromAPI(uid) {
     try {
       let allProducts = [];
+      const seenIds = new Set(); // Для фильтрации дублей
       let page = 0;
       let hasMore = true;
       let emptyPagesCount = 0;
@@ -156,18 +157,30 @@ class FettaParser {
         const data = response.data;
         
         if (data.products && data.products.length > 0) {
-          console.log(`  Страница p=${page}: ${data.products.length} товаров`);
-          allProducts = allProducts.concat(data.products);
-          emptyPagesCount = 0; // Сброс счётчика пустых страниц
+          let newProducts = 0;
+          let duplicates = 0;
+          
+          // Фильтруем дубли по ID товара
+          for (const product of data.products) {
+            if (!seenIds.has(product.id)) {
+              seenIds.add(product.id);
+              allProducts.push(product);
+              newProducts++;
+            } else {
+              duplicates++;
+            }
+          }
+          
+          console.log(`  Страница p=${page}: ${data.products.length} товаров (новых: ${newProducts}, дублей: ${duplicates})`);
+          
+          if (newProducts === 0) {
+            emptyPagesCount++;
+          } else {
+            emptyPagesCount = 0;
+          }
         } else {
           console.log(`  Страница p=${page}: пустая`);
           emptyPagesCount++;
-        }
-
-        // Проверяем totalPages если есть
-        if (data.totalPages) {
-          console.log(`  API говорит totalPages: ${data.totalPages}`);
-          // Не доверяем totalPages, идём дальше пока есть товары
         }
 
         page++;
@@ -179,7 +192,7 @@ class FettaParser {
         }
       }
 
-      console.log(`  Итого загружено: ${allProducts.length} товаров`);
+      console.log(`  Итого уникальных товаров: ${allProducts.length}`);
       return allProducts;
     } catch (error) {
       console.error('Ошибка при получении вишлиста из API:', error.message);
