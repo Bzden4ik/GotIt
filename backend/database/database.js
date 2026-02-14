@@ -104,8 +104,14 @@ class DatabaseService {
   // ── Пользователи ──
 
   async createUser(telegramId, username, firstName) {
+    // Проверяем существует ли уже
+    const existing = await this.getUserByTelegramId(telegramId);
+    if (existing) {
+      return; // Пользователь уже есть, не делаем write
+    }
+    
     await this.db.execute({
-      sql: `INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)`,
+      sql: `INSERT INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)`,
       args: [telegramId, username, firstName]
     });
   }
@@ -130,15 +136,41 @@ class DatabaseService {
 
   async createOrUpdateStreamer(data) {
     const { nickname, name, username, avatar, description, fettaUrl } = data;
-    await this.db.execute({
-      sql: `INSERT INTO streamers (nickname, name, username, avatar, description, fetta_url, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(nickname) DO UPDATE SET
-              name = excluded.name, username = excluded.username,
-              avatar = excluded.avatar, description = excluded.description,
-              fetta_url = excluded.fetta_url, updated_at = CURRENT_TIMESTAMP`,
-      args: [nickname, name, username, avatar, description, fettaUrl]
-    });
+    
+    // Проверяем существующего стримера
+    const existing = await this.getStreamerByNickname(nickname);
+    
+    if (existing) {
+      // Проверяем нужно ли обновлять
+      const needsUpdate = 
+        existing.name !== name ||
+        existing.username !== username ||
+        existing.avatar !== avatar ||
+        existing.description !== description ||
+        existing.fetta_url !== fettaUrl;
+      
+      if (!needsUpdate) {
+        console.log(`Стример ${nickname} не изменился, пропуск UPDATE`);
+        return existing;
+      }
+      
+      console.log(`Обновление данных стримера ${nickname}`);
+      await this.db.execute({
+        sql: `UPDATE streamers SET 
+              name = ?, username = ?, avatar = ?, description = ?, 
+              fetta_url = ?, updated_at = CURRENT_TIMESTAMP 
+              WHERE nickname = ?`,
+        args: [name, username, avatar, description, fettaUrl, nickname]
+      });
+    } else {
+      console.log(`Создание нового стримера ${nickname}`);
+      await this.db.execute({
+        sql: `INSERT INTO streamers (nickname, name, username, avatar, description, fetta_url, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        args: [nickname, name, username, avatar, description, fettaUrl]
+      });
+    }
+    
     return this.getStreamerByNickname(nickname);
   }
 
@@ -167,8 +199,14 @@ class DatabaseService {
     const streamer = await this.getStreamerById(streamerId);
     if (!streamer) throw new Error(`Стример с ID ${streamerId} не найден в базе данных`);
 
+    // Проверяем уже отслеживается ли
+    const isTracked = await this.isStreamerTracked(userId, streamerId);
+    if (isTracked) {
+      return; // Уже отслеживается, не делаем write
+    }
+
     await this.db.execute({
-      sql: 'INSERT OR IGNORE INTO user_streamers (user_id, streamer_id) VALUES (?, ?)',
+      sql: 'INSERT INTO user_streamers (user_id, streamer_id) VALUES (?, ?)',
       args: [userId, streamerId]
     });
   }
@@ -203,22 +241,63 @@ class DatabaseService {
   // ── Вишлист ──
 
   async saveWishlistItems(streamerId, items) {
-    const stmts = [
-      { sql: 'DELETE FROM wishlist_items WHERE streamer_id = ?', args: [streamerId] }
-    ];
+    // Получаем текущие товары из базы
+    const existingItems = await this.getWishlistItems(streamerId);
+    const existingHashes = new Map(existingItems.map(i => [i.item_hash, i]));
     
-    console.log(`  Сохранение ${items.length} товаров для стримера ID ${streamerId}`);
-    
+    // Генерируем хеши для новых товаров
+    const newItemsMap = new Map();
     for (const item of items) {
       const hash = this.generateItemHash(item);
-      stmts.push({
-        sql: `INSERT INTO wishlist_items (streamer_id, image, price, name, product_url, item_hash)
-              VALUES (?, ?, ?, ?, ?, ?)`,
-        args: [streamerId, item.image, item.price, item.name, item.productUrl, hash]
-      });
+      newItemsMap.set(hash, item);
     }
     
-    await this.db.batch(stmts, 'write');
+    const stmts = [];
+    
+    // Удаляем товары, которых больше нет
+    const toDelete = [];
+    for (const [hash, item] of existingHashes) {
+      if (!newItemsMap.has(hash)) {
+        toDelete.push(item.id);
+      }
+    }
+    
+    if (toDelete.length > 0) {
+      console.log(`  Удаление ${toDelete.length} устаревших товаров`);
+      for (const id of toDelete) {
+        stmts.push({
+          sql: 'DELETE FROM wishlist_items WHERE id = ?',
+          args: [id]
+        });
+      }
+    }
+    
+    // Добавляем только новые товары
+    const toAdd = [];
+    for (const [hash, item] of newItemsMap) {
+      if (!existingHashes.has(hash)) {
+        toAdd.push({ hash, item });
+      }
+    }
+    
+    if (toAdd.length > 0) {
+      console.log(`  Добавление ${toAdd.length} новых товаров в базу`);
+      for (const { hash, item } of toAdd) {
+        stmts.push({
+          sql: `INSERT INTO wishlist_items (streamer_id, image, price, name, product_url, item_hash)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [streamerId, item.image, item.price, item.name, item.productUrl, hash]
+        });
+      }
+    }
+    
+    // Выполняем только если есть изменения
+    if (stmts.length > 0) {
+      await this.db.batch(stmts, 'write');
+      console.log(`  ✓ База обновлена (writes: ${stmts.length})`);
+    } else {
+      console.log(`  ✓ Изменений нет, база не трогается (writes: 0)`);
+    }
   }
 
   async getWishlistItems(streamerId) {
@@ -268,8 +347,14 @@ class DatabaseService {
   // ── Группы ──
 
   async createGroup(chatId, title, addedByUserId) {
+    // Проверяем существует ли уже
+    const existing = await this.getGroupByChatId(chatId);
+    if (existing) {
+      return existing; // Группа уже есть, не делаем write
+    }
+    
     await this.db.execute({
-      sql: `INSERT OR IGNORE INTO groups (chat_id, title, added_by_user_id) VALUES (?, ?, ?)`,
+      sql: `INSERT INTO groups (chat_id, title, added_by_user_id) VALUES (?, ?, ?)`,
       args: [chatId, title, addedByUserId]
     });
     return this.getGroupByChatId(chatId);
@@ -284,8 +369,18 @@ class DatabaseService {
   }
 
   async linkUserToGroup(userId, groupId) {
+    // Проверяем уже связаны ли
+    const rs = await this.db.execute({
+      sql: 'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ?',
+      args: [userId, groupId]
+    });
+    
+    if (rs.rows.length > 0) {
+      return; // Уже связаны, не делаем write
+    }
+    
     await this.db.execute({
-      sql: 'INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)',
+      sql: 'INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)',
       args: [userId, groupId]
     });
   }
@@ -311,14 +406,37 @@ class DatabaseService {
   }
 
   async updateStreamerSettings(userId, streamerId, settings) {
-    await this.db.execute({
-      sql: `INSERT INTO user_streamer_settings (user_id, streamer_id, notifications_enabled, notify_in_pm)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id, streamer_id) DO UPDATE SET
-              notifications_enabled = excluded.notifications_enabled,
-              notify_in_pm = excluded.notify_in_pm`,
-      args: [userId, streamerId, settings.notifications_enabled, settings.notify_in_pm]
+    // Проверяем текущие настройки
+    const current = await this.getStreamerSettings(userId, streamerId);
+    
+    // Если ничего не изменилось - не делаем write
+    if (current.notifications_enabled === settings.notifications_enabled &&
+        current.notify_in_pm === settings.notify_in_pm) {
+      return;
+    }
+    
+    // Проверяем есть ли запись
+    const rs = await this.db.execute({
+      sql: 'SELECT 1 FROM user_streamer_settings WHERE user_id = ? AND streamer_id = ?',
+      args: [userId, streamerId]
     });
+    
+    if (rs.rows.length > 0) {
+      // UPDATE только если изменилось
+      await this.db.execute({
+        sql: `UPDATE user_streamer_settings SET 
+              notifications_enabled = ?, notify_in_pm = ? 
+              WHERE user_id = ? AND streamer_id = ?`,
+        args: [settings.notifications_enabled, settings.notify_in_pm, userId, streamerId]
+      });
+    } else {
+      // INSERT новой записи
+      await this.db.execute({
+        sql: `INSERT INTO user_streamer_settings (user_id, streamer_id, notifications_enabled, notify_in_pm)
+              VALUES (?, ?, ?, ?)`,
+        args: [userId, streamerId, settings.notifications_enabled, settings.notify_in_pm]
+      });
+    }
   }
 
   async getGroupStreamerSettings(groupId, streamerId) {
@@ -330,12 +448,35 @@ class DatabaseService {
   }
 
   async updateGroupStreamerSettings(groupId, streamerId, enabled) {
-    await this.db.execute({
-      sql: `INSERT INTO group_streamer_settings (group_id, streamer_id, enabled)
-            VALUES (?, ?, ?)
-            ON CONFLICT(group_id, streamer_id) DO UPDATE SET enabled = excluded.enabled`,
-      args: [groupId, streamerId, enabled ? 1 : 0]
+    const enabledInt = enabled ? 1 : 0;
+    
+    // Проверяем текущие настройки
+    const current = await this.getGroupStreamerSettings(groupId, streamerId);
+    
+    // Если ничего не изменилось - не делаем write
+    if (current.enabled === enabledInt) {
+      return;
+    }
+    
+    // Проверяем есть ли запись
+    const rs = await this.db.execute({
+      sql: 'SELECT 1 FROM group_streamer_settings WHERE group_id = ? AND streamer_id = ?',
+      args: [groupId, streamerId]
     });
+    
+    if (rs.rows.length > 0) {
+      // UPDATE только если изменилось
+      await this.db.execute({
+        sql: 'UPDATE group_streamer_settings SET enabled = ? WHERE group_id = ? AND streamer_id = ?',
+        args: [enabledInt, groupId, streamerId]
+      });
+    } else {
+      // INSERT новой записи
+      await this.db.execute({
+        sql: 'INSERT INTO group_streamer_settings (group_id, streamer_id, enabled) VALUES (?, ?, ?)',
+        args: [groupId, streamerId, enabledInt]
+      });
+    }
   }
 
   async getGroupsForStreamerNotifications(streamerId) {

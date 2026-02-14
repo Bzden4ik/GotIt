@@ -115,7 +115,6 @@ class Scheduler {
       }
 
       await db.saveWishlistItems(streamer.id, currentItems);
-      console.log(`  ✓ Вишлист обновлён в базе (${currentItems.length} товаров)`);
     } catch (error) {
       console.error(`  ✗ Ошибка при проверке ${streamer.nickname}:`, error.message);
     }
