@@ -478,7 +478,34 @@ class TelegramBot {
         action: 'typing'
       });
 
-      const response = await this.ai.getResponse(text, userId);
+      // Получаем контекст пользователя из базы
+      const user = await db.getUserByTelegramId(userId);
+      let userContext = null;
+
+      if (user) {
+        const streamers = await db.getTrackedStreamers(user.id);
+        
+        // Загружаем вишлисты для каждого стримера
+        const streamersWithWishlist = await Promise.all(
+          streamers.map(async (streamer) => {
+            const wishlist = await db.getWishlistItems(streamer.id);
+            return {
+              ...streamer,
+              wishlist: wishlist.map(item => ({
+                name: item.name,
+                price: item.price,
+                image: item.image
+              }))
+            };
+          })
+        );
+
+        userContext = {
+          streamers: streamersWithWishlist
+        };
+      }
+
+      const response = await this.ai.getResponse(text, userId, userContext);
 
       if (!response) {
         await this.sendMessage(chatId, 'Сэмпай, у меня технические проблемы 😔 Попробуй команды: /start, /settings, /groups');
