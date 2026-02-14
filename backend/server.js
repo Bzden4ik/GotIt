@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const path = require('path');
 require('dotenv').config();
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
@@ -12,7 +13,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 function verifyTelegramAuth(data) {
   if (!BOT_TOKEN) {
