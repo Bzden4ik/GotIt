@@ -17,6 +17,7 @@ class TelegramBot {
         text: text,
         parse_mode: options.parse_mode || 'HTML',
         disable_web_page_preview: options.disable_web_page_preview || false,
+        reply_markup: options.reply_markup,
         ...options
       });
       return response.data;
@@ -26,6 +27,39 @@ class TelegramBot {
         console.error('Детали ошибки:', error.response.data);
       }
       throw error;
+    }
+  }
+
+  /**
+   * Ответить на callback query
+   */
+  async answerCallbackQuery(callbackQueryId, text = '', showAlert = false) {
+    try {
+      await axios.post(`${this.apiUrl}/answerCallbackQuery`, {
+        callback_query_id: callbackQueryId,
+        text: text,
+        show_alert: showAlert
+      });
+    } catch (error) {
+      console.error('Ошибка ответа на callback:', error.message);
+    }
+  }
+
+  /**
+   * Редактировать сообщение
+   */
+  async editMessageText(chatId, messageId, text, options = {}) {
+    try {
+      await axios.post(`${this.apiUrl}/editMessageText`, {
+        chat_id: chatId,
+        message_id: messageId,
+        text: text,
+        parse_mode: options.parse_mode || 'HTML',
+        reply_markup: options.reply_markup,
+        ...options
+      });
+    } catch (error) {
+      console.error('Ошибка редактирования сообщения:', error.message);
     }
   }
 
@@ -47,13 +81,140 @@ class TelegramBot {
 1. Зайди на сайт: https://bzden4ik.github.io/GotIt
 2. Авторизуйся через Telegram
 3. Добавь стримеров для отслеживания
-4. Готово! Я буду писать тебе о каждом обновлении 💌
 
-Если хочешь, чтобы я писала в группу - просто добавь меня туда, и я пойму! 😊`;
+<b>Команды:</b>
+/settings - Настроить уведомления
+/groups - Настроить группы (если добавила меня в группы)`;
 
     return await this.sendMessage(chatId, message, {
       parse_mode: 'HTML',
       disable_web_page_preview: true
+    });
+  }
+
+  /**
+   * Показать меню настроек
+   */
+  async sendSettingsMenu(chatId, userId) {
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
+    }
+
+    const streamers = await db.getTrackedStreamers(user.id);
+    if (streamers.length === 0) {
+      return await this.sendMessage(chatId, 'У тебя пока нет отслеживаемых стримеров. Добавь их на сайте!');
+    }
+
+    const buttons = [];
+    for (const streamer of streamers) {
+      const settings = await db.getStreamerSettings(user.id, streamer.id);
+      const icon = settings.notifications_enabled ? '🔔' : '🔕';
+      buttons.push([{
+        text: `${icon} ${streamer.name || streamer.nickname}`,
+        callback_data: `toggle_notif_${streamer.id}`
+      }]);
+    }
+
+    const message = `⚙️ <b>Настройки уведомлений</b>
+
+Выбери стримера, чтобы включить/выключить уведомления:
+
+🔔 - уведомления включены
+🔕 - уведомления выключены`;
+
+    return await this.sendMessage(chatId, message, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: buttons
+      }
+    });
+  }
+
+  /**
+   * Показать меню групп
+   */
+  async sendGroupsMenu(chatId, userId) {
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
+    }
+
+    const groups = await db.getUserGroups(user.id);
+    if (groups.length === 0) {
+      return await this.sendMessage(chatId, 'Я пока не добавлена ни в одну твою группу. Добавь меня в группу, чтобы настроить уведомления!');
+    }
+
+    const buttons = groups.map(group => [{
+      text: `👥 ${group.title}`,
+      callback_data: `group_${group.id}`
+    }]);
+
+    const message = `👥 <b>Мои группы</b>
+
+Выбери группу, чтобы настроить уведомления:`;
+
+    return await this.sendMessage(chatId, message, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: buttons
+      }
+    });
+  }
+
+  /**
+   * Показать стримеров для группы
+   */
+  async sendGroupStreamersMenu(chatId, userId, groupId, messageId = null) {
+    const user = await db.getUserById(userId);
+    if (!user) return;
+
+    // groupId это ID из базы, не chat_id
+    const groups = await db.getUserGroups(user.id);
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    const streamers = await db.getTrackedStreamers(user.id);
+    if (streamers.length === 0) {
+      const text = 'У тебя нет отслеживаемых стримеров.';
+      if (messageId) {
+        return await this.editMessageText(chatId, messageId, text);
+      }
+      return await this.sendMessage(chatId, text);
+    }
+
+    const buttons = [];
+    for (const streamer of streamers) {
+      const settings = await db.getGroupStreamerSettings(group.id, streamer.id);
+      const icon = settings.enabled ? '✅' : '❌';
+      buttons.push([{
+        text: `${icon} ${streamer.name || streamer.nickname}`,
+        callback_data: `grp_${group.id}_str_${streamer.id}`
+      }]);
+    }
+
+    buttons.push([{
+      text: '« Назад',
+      callback_data: 'back_to_groups'
+    }]);
+
+    const message = `⚙️ <b>Настройки для группы: ${group.title}</b>
+
+Выбери стримеров, о которых я буду писать в эту группу:
+
+✅ - уведомления включены
+❌ - уведомления выключены`;
+
+    if (messageId) {
+      return await this.editMessageText(chatId, messageId, message, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
+
+    return await this.sendMessage(chatId, message, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons }
     });
   }
 
@@ -68,7 +229,6 @@ class TelegramBot {
     let message = `${greeting}🎁 <b>У стримера ${streamerName} появились новые товары!</b>\n\n`;
     message += `📦 Добавлено ${itemsCount} ${itemsText}:\n\n`;
 
-    // Добавляем список товаров (максимум 5 для краткости)
     const itemsToShow = items.slice(0, 5);
     itemsToShow.forEach((item, index) => {
       message += `${index + 1}. ${item.name || 'Без названия'}\n`;
@@ -99,10 +259,87 @@ class TelegramBot {
     const username = message.from.username || '';
     const firstName = message.from.first_name || '';
 
-    // Создаём пользователя если его нет
     await db.createUser(userId, username, firstName);
-
     await this.sendWelcomeMessage(chatId);
+  }
+
+  /**
+   * Обработка команды /settings
+   */
+  async handleSettingsCommand(message) {
+    const chatId = message.chat.id;
+    const userId = message.from.id;
+    await this.sendSettingsMenu(chatId, userId);
+  }
+
+  /**
+   * Обработка команды /groups
+   */
+  async handleGroupsCommand(message) {
+    const chatId = message.chat.id;
+    const userId = message.from.id;
+    await this.sendGroupsMenu(chatId, userId);
+  }
+
+  /**
+   * Обработка callback кнопок
+   */
+  async handleCallback(callbackQuery) {
+    const data = callbackQuery.data;
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const userId = callbackQuery.from.id;
+
+    const user = await db.getUserByTelegramId(userId);
+    if (!user) {
+      return await this.answerCallbackQuery(callbackQuery.id, 'Сначала авторизуйся на сайте!', true);
+    }
+
+    // Переключение уведомлений стримера
+    if (data.startsWith('toggle_notif_')) {
+      const streamerId = parseInt(data.replace('toggle_notif_', ''));
+      const settings = await db.getStreamerSettings(user.id, streamerId);
+      const newState = settings.notifications_enabled ? 0 : 1;
+
+      await db.updateStreamerSettings(user.id, streamerId, {
+        notifications_enabled: newState,
+        notify_in_pm: settings.notify_in_pm
+      });
+
+      await this.answerCallbackQuery(callbackQuery.id, newState ? '🔔 Включено' : '🔕 Выключено');
+      await this.sendSettingsMenu(chatId, user.id);
+      return;
+    }
+
+    // Выбор группы
+    if (data.startsWith('group_')) {
+      const groupId = parseInt(data.replace('group_', ''));
+      await this.sendGroupStreamersMenu(chatId, user.id, groupId, messageId);
+      await this.answerCallbackQuery(callbackQuery.id);
+      return;
+    }
+
+    // Переключение стримера в группе
+    if (data.startsWith('grp_')) {
+      const parts = data.split('_');
+      const groupId = parseInt(parts[1]);
+      const streamerId = parseInt(parts[3]);
+
+      const settings = await db.getGroupStreamerSettings(groupId, streamerId);
+      const newState = settings.enabled ? 0 : 1;
+
+      await db.updateGroupStreamerSettings(groupId, streamerId, newState);
+      await this.answerCallbackQuery(callbackQuery.id, newState ? '✅ Включено' : '❌ Выключено');
+      await this.sendGroupStreamersMenu(chatId, user.id, groupId, messageId);
+      return;
+    }
+
+    // Назад к группам
+    if (data === 'back_to_groups') {
+      await this.sendGroupsMenu(chatId, user.id);
+      await this.answerCallbackQuery(callbackQuery.id);
+      return;
+    }
   }
 
   /**
@@ -116,28 +353,23 @@ class TelegramBot {
     const chat = myChatMember.chat;
     const from = myChatMember.from;
 
-    // Бота добавили в группу
     if (newStatus === 'member' || newStatus === 'administrator') {
       console.log(`Бот добавлен в группу: ${chat.title} (${chat.id}) пользователем ${from.first_name}`);
 
-      // Создаём пользователя если его нет
       await db.createUser(from.id, from.username || '', from.first_name || '');
       const user = await db.getUserByTelegramId(from.id);
 
-      // Создаём группу
       const group = await db.createGroup(chat.id, chat.title, user.id);
-
-      // Связываем пользователя с группой
       await db.linkUserToGroup(user.id, group.id);
 
-      // Отправляем приветствие в группу
       const message = `Привет! 💜
 
 Меня добавил${from.first_name ? ' ' + from.first_name : 'и'}, и теперь я могу писать сюда уведомления о новых товарах в вишлистах стримеров!
 
-Чтобы настроить, о каких стримерах я буду писать в эту группу - зайди на сайт и выбери нужные настройки 😊
+Чтобы настроить, о каких стримерах я буду писать сюда, напиши мне в личку команду:
+/groups
 
-🔗 https://bzden4ik.github.io/GotIt`;
+Или нажми на моё имя → "Отправить сообщение" → /groups 😊`;
 
       await this.sendMessage(chat.id, message, {
         parse_mode: 'HTML',
@@ -151,9 +383,25 @@ class TelegramBot {
    */
   async handleUpdate(update) {
     try {
-      // Команда /start
-      if (update.message && update.message.text && update.message.text.startsWith('/start')) {
-        await this.handleStartCommand(update.message);
+      // Команды
+      if (update.message && update.message.text) {
+        if (update.message.text.startsWith('/start')) {
+          await this.handleStartCommand(update.message);
+          return;
+        }
+        if (update.message.text.startsWith('/settings')) {
+          await this.handleSettingsCommand(update.message);
+          return;
+        }
+        if (update.message.text.startsWith('/groups')) {
+          await this.handleGroupsCommand(update.message);
+          return;
+        }
+      }
+
+      // Callback кнопки
+      if (update.callback_query) {
+        await this.handleCallback(update.callback_query);
         return;
       }
 
