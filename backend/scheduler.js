@@ -56,13 +56,14 @@ class Scheduler {
       const streamers = await db.getAllTrackedStreamers();
       if (streamers.length === 0) { console.log('Нет отслеживаемых стримеров'); return; }
       
-      // Убираем дубли по nickname
+      // Убираем дубли по nickname (case-insensitive)
       const uniqueStreamers = [];
       const seenNicknames = new Set();
       
       for (const streamer of streamers) {
-        if (!seenNicknames.has(streamer.nickname)) {
-          seenNicknames.add(streamer.nickname);
+        const nicknameLower = streamer.nickname.toLowerCase();
+        if (!seenNicknames.has(nicknameLower)) {
+          seenNicknames.add(nicknameLower);
           uniqueStreamers.push(streamer);
         } else {
           console.log(`⚠ Пропущен дубль: ${streamer.nickname} (id: ${streamer.id})`);

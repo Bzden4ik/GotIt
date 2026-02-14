@@ -141,22 +141,45 @@ class FettaParser {
     try {
       let allProducts = [];
       let page = 0;
-      let totalPages = 1;
+      let hasMore = true;
+      let emptyPagesCount = 0;
+      const maxEmptyPages = 2; // Если 2 пустых страницы подряд - останавливаемся
 
-      while (page < totalPages) {
+      console.log(`Загрузка товаров для UID ${uid}...`);
+
+      while (hasMore && emptyPagesCount < maxEmptyPages) {
         const response = await axios.get(
           `${this.apiUrl}/product/products/public/get`,
           { params: { uid, p: page } }
         );
 
         const data = response.data;
-        if (data.products) {
+        
+        if (data.products && data.products.length > 0) {
+          console.log(`  Страница p=${page}: ${data.products.length} товаров`);
           allProducts = allProducts.concat(data.products);
+          emptyPagesCount = 0; // Сброс счётчика пустых страниц
+        } else {
+          console.log(`  Страница p=${page}: пустая`);
+          emptyPagesCount++;
         }
-        totalPages = data.totalPages || 1;
+
+        // Проверяем totalPages если есть
+        if (data.totalPages) {
+          console.log(`  API говорит totalPages: ${data.totalPages}`);
+          // Не доверяем totalPages, идём дальше пока есть товары
+        }
+
         page++;
+        
+        // Защита от бесконечного цикла
+        if (page > 10) {
+          console.log(`  ⚠ Достигнут лимит страниц (10), останавливаемся`);
+          break;
+        }
       }
 
+      console.log(`  Итого загружено: ${allProducts.length} товаров`);
       return allProducts;
     } catch (error) {
       console.error('Ошибка при получении вишлиста из API:', error.message);
