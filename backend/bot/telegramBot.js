@@ -95,15 +95,23 @@ class TelegramBot {
   /**
    * Показать меню настроек
    */
-  async sendSettingsMenu(chatId, telegramId) {
+  async sendSettingsMenu(chatId, telegramId, messageId = null) {
     const user = await db.getUserByTelegramId(telegramId);
     if (!user) {
-      return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
+      const text = 'Сначала авторизуйся на сайте через Telegram!';
+      if (messageId) {
+        return await this.editMessageText(chatId, messageId, text);
+      }
+      return await this.sendMessage(chatId, text);
     }
 
     const streamers = await db.getTrackedStreamers(user.id);
     if (streamers.length === 0) {
-      return await this.sendMessage(chatId, 'У тебя пока нет отслеживаемых стримеров. Добавь их на сайте!');
+      const text = 'У тебя пока нет отслеживаемых стримеров. Добавь их на сайте!';
+      if (messageId) {
+        return await this.editMessageText(chatId, messageId, text);
+      }
+      return await this.sendMessage(chatId, text);
     }
 
     const buttons = [];
@@ -123,6 +131,13 @@ class TelegramBot {
 🔔 - уведомления включены
 🔕 - уведомления выключены`;
 
+    if (messageId) {
+      return await this.editMessageText(chatId, messageId, message, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
+
     return await this.sendMessage(chatId, message, {
       parse_mode: 'HTML',
       reply_markup: {
@@ -134,15 +149,23 @@ class TelegramBot {
   /**
    * Показать меню групп
    */
-  async sendGroupsMenu(chatId, telegramId) {
+  async sendGroupsMenu(chatId, telegramId, messageId = null) {
     const user = await db.getUserByTelegramId(telegramId);
     if (!user) {
-      return await this.sendMessage(chatId, 'Сначала авторизуйся на сайте через Telegram!');
+      const text = 'Сначала авторизуйся на сайте через Telegram!';
+      if (messageId) {
+        return await this.editMessageText(chatId, messageId, text);
+      }
+      return await this.sendMessage(chatId, text);
     }
 
     const groups = await db.getUserGroups(user.id);
     if (groups.length === 0) {
-      return await this.sendMessage(chatId, 'Я пока не добавлена ни в одну твою группу. Добавь меня в группу, чтобы настроить уведомления!');
+      const text = 'Я пока не добавлена ни в одну твою группу. Добавь меня в группу, чтобы настроить уведомления!';
+      if (messageId) {
+        return await this.editMessageText(chatId, messageId, text);
+      }
+      return await this.sendMessage(chatId, text);
     }
 
     const buttons = groups.map(group => [{
@@ -153,6 +176,13 @@ class TelegramBot {
     const message = `👥 <b>Мои группы</b>
 
 Выбери группу, чтобы настроить уведомления:`;
+
+    if (messageId) {
+      return await this.editMessageText(chatId, messageId, message, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
 
     return await this.sendMessage(chatId, message, {
       parse_mode: 'HTML',
@@ -307,7 +337,7 @@ class TelegramBot {
       });
 
       await this.answerCallbackQuery(callbackQuery.id, newState ? '🔔 Включено' : '🔕 Выключено');
-      await this.sendSettingsMenu(chatId, telegramId);
+      await this.sendSettingsMenu(chatId, telegramId, messageId);
       return;
     }
 
@@ -336,7 +366,7 @@ class TelegramBot {
 
     // Назад к группам
     if (data === 'back_to_groups') {
-      await this.sendGroupsMenu(chatId, telegramId);
+      await this.sendGroupsMenu(chatId, telegramId, messageId);
       await this.answerCallbackQuery(callbackQuery.id);
       return;
     }
