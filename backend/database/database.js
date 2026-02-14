@@ -263,7 +263,6 @@ class DatabaseService {
     }
     
     if (toDelete.length > 0) {
-      console.log(`  Удаление ${toDelete.length} устаревших товаров`);
       for (const id of toDelete) {
         stmts.push({
           sql: 'DELETE FROM wishlist_items WHERE id = ?',
@@ -281,7 +280,6 @@ class DatabaseService {
     }
     
     if (toAdd.length > 0) {
-      console.log(`  Добавление ${toAdd.length} новых товаров в базу`);
       for (const { hash, item } of toAdd) {
         stmts.push({
           sql: `INSERT INTO wishlist_items (streamer_id, image, price, name, product_url, item_hash)
@@ -294,9 +292,9 @@ class DatabaseService {
     // Выполняем только если есть изменения
     if (stmts.length > 0) {
       await this.db.batch(stmts, 'write');
-      console.log(`  ✓ База обновлена (writes: ${stmts.length})`);
+      console.log(`  ✓ База обновлена: +${toAdd.length} новых, -${toDelete.length} удалённых (writes: ${stmts.length})`);
     } else {
-      console.log(`  ✓ Изменений нет, база не трогается (writes: 0)`);
+      console.log(`  ✓ Изменений нет (writes: 0)`);
     }
   }
 
@@ -322,29 +320,6 @@ class DatabaseService {
       hash = ((hash << 5) - hash) + c;
       hash = hash & hash;
     }
-    return hash.toString();
-  }
-
-  // Для отладки - генерация хеша с логированием
-  generateItemHashDebug(item, label = '') {
-    const name = item.name || '';
-    const price = item.price || '';
-    const image = item.image || '';
-    const str = `${name}_${price}_${image}`;
-    
-    console.log(`  [DEBUG ${label}] Hash для: "${name.substring(0, 30)}..."`);
-    console.log(`    price: "${price}"`);
-    console.log(`    image: "${image.substring(0, 50)}..."`);
-    console.log(`    string: "${str.substring(0, 100)}..."`);
-    
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const c = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + c;
-      hash = hash & hash;
-    }
-    
-    console.log(`    hash: ${hash.toString()}`);
     return hash.toString();
   }
 

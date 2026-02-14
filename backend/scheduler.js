@@ -122,34 +122,15 @@ class Scheduler {
       // Проверяем что есть в базе
       const existingItems = await db.getWishlistItems(streamer.id);
       console.log(`  В базе сохранено товаров: ${existingItems.length}`);
-      
-      // Логируем хеши из базы для отладки
-      if (existingItems.length > 0 && existingItems.length <= 10) {
-        console.log(`  Хеши в базе:`);
-        existingItems.forEach((item, i) => {
-          console.log(`    ${i + 1}. ${item.name?.substring(0, 50)} - ${item.price} (hash: ${item.item_hash})`);
-        });
-      }
 
       const newItems = await db.getNewWishlistItems(streamer.id, currentItems);
       console.log(`  Определено новых товаров: ${newItems.length}`);
 
       if (newItems.length > 0) {
         console.log(`  🎁 Найдено новых товаров: ${newItems.length}`);
-        
-        // Детальное логирование для отладки
-        console.log(`  Новые товары - генерация хешей:`);
         newItems.forEach((item, i) => {
-          db.generateItemHashDebug(item, `NEW #${i + 1}`);
+          console.log(`    ${i + 1}. ${item.name?.substring(0, 60)} - ${item.price}`);
         });
-        
-        // Для сравнения покажем что в базе
-        if (existingItems.length > 0 && existingItems.length <= 5) {
-          console.log(`  Существующие товары в базе:`);
-          existingItems.forEach((item, i) => {
-            console.log(`    ${i + 1}. "${item.name?.substring(0, 30)}..." hash: ${item.item_hash}`);
-          });
-        }
         
         // Проверяем кулдаун - не отправляли ли мы уведомление недавно
         const lastNotification = this.lastNotifications.get(streamer.id);
