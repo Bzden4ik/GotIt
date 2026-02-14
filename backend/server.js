@@ -299,9 +299,9 @@ async function startServer() {
       }
 
       const scheduler = new Scheduler(BOT_TOKEN);
-      const checkInterval = parseInt(process.env.CHECK_INTERVAL) || 5;
+      const checkInterval = parseInt(process.env.CHECK_INTERVAL) || 30;
       scheduler.start(checkInterval);
-      console.log(`Планировщик настроен на проверку каждые ${checkInterval} секунд`);
+      console.log(`✅ Планировщик настроен на проверку каждые ${checkInterval} секунд`);
     });
   } catch (error) {
     console.error('Ошибка запуска сервера:', error);

@@ -2,18 +2,38 @@ const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const TelegramBot = require('./bot/telegramBot');
 
+// Глобальная переменная для отслеживания запущенного планировщика
+let globalSchedulerInstance = null;
+
 class Scheduler {
   constructor(botToken) {
+    // Проверяем что не создан другой экземпляр
+    if (globalSchedulerInstance) {
+      console.log('⚠ Планировщик уже создан, используем существующий экземпляр');
+      return globalSchedulerInstance;
+    }
+    
+    console.log('📅 Создание нового экземпляра планировщика');
+    
+    this.schedulerId = Math.random().toString(36).substring(7); // Уникальный ID
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
     this.intervalId = null;
     this.lastNotifications = new Map(); // streamerId -> timestamp
     this.notificationCooldown = 60 * 1000; // 1 минута между уведомлениями для одного стримера
+    
+    console.log(`📋 Планировщик ID: ${this.schedulerId}`);
+    
+    globalSchedulerInstance = this;
   }
 
-  start(intervalSeconds = 5) {
-    if (this.isRunning) { console.log('Планировщик уже запущен'); return; }
-    console.log(`Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 23:00 МСК`);
+  start(intervalSeconds = 30) {
+    if (this.isRunning) { 
+      console.log('⚠ Планировщик уже запущен, пропускаем повторный запуск');
+      return; 
+    }
+    
+    console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 23:00 МСК`);
     
     this.intervalId = setInterval(async () => {
       if (this.isWithinWorkingHours()) {
@@ -22,7 +42,9 @@ class Scheduler {
     }, intervalSeconds * 1000);
     
     this.isRunning = true;
-    console.log('✓ Планировщик запущен');
+    console.log('✅ Планировщик запущен успешно');
+    
+    // Первая проверка через 3 секунды
     setTimeout(() => {
       if (this.isWithinWorkingHours()) {
         console.log('Выполняется первая проверка стримеров...');
@@ -31,6 +53,15 @@ class Scheduler {
         console.log('Пропуск первой проверки - вне рабочего времени');
       }
     }, 10000);
+  }
+
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      this.isRunning = false;
+      console.log('✓ Планировщик остановлен');
+    }
   }
 
   stop() {
@@ -52,6 +83,7 @@ class Scheduler {
   async checkAllStreamers() {
     console.log('\n=== Начало проверки стримеров ===');
     console.log(`Время: ${new Date().toLocaleString('ru-RU')}`);
+    console.log(`Планировщик ID: ${this.schedulerId || 'legacy'}`);
     try {
       const streamers = await db.getAllTrackedStreamers();
       if (streamers.length === 0) { console.log('Нет отслеживаемых стримеров'); return; }
