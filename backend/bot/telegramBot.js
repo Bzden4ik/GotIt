@@ -523,7 +523,10 @@ class TelegramBot {
         messageText += `\n\n<i>(AI сообщений осталось сегодня: ${response.remaining})</i>`;
       }
 
-      await this.sendMessage(chatId, messageText, { parse_mode: 'HTML' });
+      await this.sendMessage(chatId, messageText, { 
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      });
     } catch (error) {
       console.error('Ошибка AI обработки:', error);
       await this.sendMessage(chatId, 'Извини, Сэмпай, что-то пошло не так 😔');
