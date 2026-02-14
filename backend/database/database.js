@@ -351,8 +351,12 @@ class DatabaseService {
   // ── Планировщик ──
 
   async getAllTrackedStreamers() {
+    // DISTINCT по nickname чтобы избежать дублей
     const rs = await this.db.execute(
-      'SELECT DISTINCT s.* FROM streamers s JOIN user_streamers us ON s.id = us.streamer_id'
+      `SELECT DISTINCT s.id, s.nickname, s.name, s.username, s.avatar, s.description, s.fetta_url, s.created_at, s.updated_at 
+       FROM streamers s 
+       JOIN user_streamers us ON s.id = us.streamer_id
+       GROUP BY s.nickname`
     );
     return rs.rows;
   }

@@ -55,10 +55,25 @@ class Scheduler {
     try {
       const streamers = await db.getAllTrackedStreamers();
       if (streamers.length === 0) { console.log('Нет отслеживаемых стримеров'); return; }
-      console.log(`Найдено стримеров для проверки: ${streamers.length}`);
+      
+      // Убираем дубли по nickname
+      const uniqueStreamers = [];
+      const seenNicknames = new Set();
+      
       for (const streamer of streamers) {
+        if (!seenNicknames.has(streamer.nickname)) {
+          seenNicknames.add(streamer.nickname);
+          uniqueStreamers.push(streamer);
+        } else {
+          console.log(`⚠ Пропущен дубль: ${streamer.nickname} (id: ${streamer.id})`);
+        }
+      }
+      
+      console.log(`Найдено стримеров: ${streamers.length}, уникальных: ${uniqueStreamers.length}`);
+      
+      for (const streamer of uniqueStreamers) {
         await this.checkStreamer(streamer);
-        await this.sleep(2000);
+        await this.sleep(3000); // Увеличил с 2 до 3 секунд
       }
       console.log('=== Проверка завершена ===\n');
     } catch (error) {
@@ -69,11 +84,38 @@ class Scheduler {
   async checkStreamer(streamer) {
     try {
       console.log(`\nПроверка стримера: ${streamer.nickname}`);
-      const result = await fettaParser.getStreamerInfo(streamer.nickname);
-      if (!result.success || !result.wishlist) {
+      
+      let result = null;
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      // Retry логика для 429 ошибки
+      while (retryCount <= maxRetries) {
+        try {
+          result = await fettaParser.getStreamerInfo(streamer.nickname);
+          break; // Успешно получили данные
+        } catch (error) {
+          if (error.message && error.message.includes('429')) {
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              const waitTime = retryCount * 5; // 5, 10 секунд
+              console.log(`  ⚠ Rate limit (429), ожидание ${waitTime} сек (попытка ${retryCount}/${maxRetries})`);
+              await this.sleep(waitTime * 1000);
+            } else {
+              console.log(`  ✗ Превышен лимит попыток, пропускаем стримера`);
+              return;
+            }
+          } else {
+            throw error; // Другая ошибка - прокидываем дальше
+          }
+        }
+      }
+      
+      if (!result || !result.success || !result.wishlist) {
         console.log(`  ⚠ Не удалось получить вишлист для ${streamer.nickname}`);
         return;
       }
+      
       const currentItems = result.wishlist;
       console.log(`  Получено товаров из API: ${currentItems.length}`);
 
