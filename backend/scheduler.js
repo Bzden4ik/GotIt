@@ -75,32 +75,47 @@ class Scheduler {
       const currentItems = result.wishlist;
       console.log(`  Получено товаров из API: ${currentItems.length}`);
 
+      // Проверяем что есть в базе
+      const existingItems = await db.getWishlistItems(streamer.id);
+      console.log(`  В базе сохранено товаров: ${existingItems.length}`);
+
       const newItems = await db.getNewWishlistItems(streamer.id, currentItems);
+      console.log(`  Определено новых товаров: ${newItems.length}`);
 
       if (newItems.length > 0) {
-        console.log(`  🎁 Найдено новых товаров: ${newItems.length}`);
+        console.log(`  🎁 Новые товары:`);
+        newItems.forEach((item, i) => {
+          const hash = db.generateItemHash(item);
+          console.log(`    ${i + 1}. ${item.name?.substring(0, 50) || 'Без названия'} (hash: ${hash})`);
+        });
         
-        // Получаем подписчиков стримера
-        const followers = await db.getStreamerFollowers(streamer.id);
-        console.log(`  Отправка уведомлений для ${followers.length} пользователей`);
-        
-        // Отправляем в личку пользователям
-        for (const follower of followers) {
-          await this.sendNotificationToUser(follower, streamer, newItems);
-        }
+        // Защита от спама: если слишком много новых товаров одновременно - возможно база была очищена
+        if (newItems.length > 15) {
+          console.log(`  ⚠ Слишком много новых товаров (${newItems.length}), пропускаем уведомления`);
+          console.log(`  Вероятно это после очистки базы или первый запуск`);
+        } else {
+          // Получаем подписчиков стримера
+          const followers = await db.getStreamerFollowers(streamer.id);
+          console.log(`  Отправка уведомлений для ${followers.length} пользователей`);
+          
+          // Отправляем в личку пользователям
+          for (const follower of followers) {
+            await this.sendNotificationToUser(follower, streamer, newItems);
+          }
 
-        // Отправляем в группы
-        const groups = await db.getGroupsForStreamerNotifications(streamer.id);
-        console.log(`  Отправка в ${groups.length} групп`);
-        for (const group of groups) {
-          await this.sendNotificationToGroup(group, streamer, newItems);
+          // Отправляем в группы
+          const groups = await db.getGroupsForStreamerNotifications(streamer.id);
+          console.log(`  Отправка в ${groups.length} групп`);
+          for (const group of groups) {
+            await this.sendNotificationToGroup(group, streamer, newItems);
+          }
         }
       } else {
         console.log(`  ✓ Новых товаров нет`);
       }
 
       await db.saveWishlistItems(streamer.id, currentItems);
-      console.log(`  ✓ Вишлист обновлён в базе`);
+      console.log(`  ✓ Вишлист обновлён в базе (${currentItems.length} товаров)`);
     } catch (error) {
       console.error(`  ✗ Ошибка при проверке ${streamer.nickname}:`, error.message);
     }

@@ -206,6 +206,9 @@ class DatabaseService {
     const stmts = [
       { sql: 'DELETE FROM wishlist_items WHERE streamer_id = ?', args: [streamerId] }
     ];
+    
+    console.log(`  Сохранение ${items.length} товаров для стримера ID ${streamerId}`);
+    
     for (const item of items) {
       const hash = this.generateItemHash(item);
       stmts.push({
@@ -214,6 +217,7 @@ class DatabaseService {
         args: [streamerId, item.image, item.price, item.name, item.productUrl, hash]
       });
     }
+    
     await this.db.batch(stmts, 'write');
   }
 
