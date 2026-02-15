@@ -29,53 +29,65 @@ class Scheduler {
   }
 
   async start(intervalSeconds = 30) {
-    if (this.isRunning) { 
+    if (this.isRunning) {
       console.log('⚠ Планировщик уже запущен, пропускаем повторный запуск');
-      return; 
+      return;
     }
-    
+
     console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 3:00 МСК (ночью)`);
-    
+
     // Пытаемся захватить лок
     this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
-    
+
     if (!this.hasLock) {
       console.log('⚠ Лок занят другим инстансом, планировщик не запущен');
       console.log('💡 Если это единственный инстанс, лок освободится через 60 сек');
-      
-      // Пробуем захватить лок каждые 30 секунд
-      this.intervalId = setInterval(async () => {
+
+      // Пробуем захватить лок каждые 30 секунд (сохраняем в отдельную переменную!)
+      this.retryIntervalId = setInterval(async () => {
+        if (this.isRunning) return; // Уже запущен — не трогаем
+
         this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
         if (this.hasLock) {
           console.log('🔒 Лок захвачен! Запускаем проверки...');
+          // ВАЖНО: Очищаем retry-интервал перед запуском проверок!
+          clearInterval(this.retryIntervalId);
+          this.retryIntervalId = null;
           this.startChecks(intervalSeconds);
         }
       }, 30000);
-      
+
       return;
     }
-    
+
     console.log('🔒 Лок захвачен успешно');
     this.startChecks(intervalSeconds);
   }
 
   startChecks(intervalSeconds) {
+    // Защита от повторного вызова
+    if (this.isRunning) {
+      console.log('⚠ startChecks() вызван повторно, пропускаем');
+      return;
+    }
+
+    this.isRunning = true;
+
     // Heartbeat каждые 20 секунд
     this.heartbeatId = setInterval(async () => {
       await db.updateSchedulerHeartbeat(this.schedulerId);
     }, 20000);
-    
+
     // Основной цикл проверки
     this.intervalId = setInterval(async () => {
       if (this.isWithinWorkingHours()) {
         await this.checkAllStreamers();
       }
     }, intervalSeconds * 1000);
-    
-    this.isRunning = true;
+
     console.log('✅ Планировщик запущен успешно');
-    
-    // Первая проверка через 3 секунды
+
+    // Первая проверка через 10 секунд
     setTimeout(() => {
       if (this.isWithinWorkingHours()) {
         console.log('Выполняется первая проверка стримеров...');
@@ -91,12 +103,17 @@ class Scheduler {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    
+
+    if (this.retryIntervalId) {
+      clearInterval(this.retryIntervalId);
+      this.retryIntervalId = null;
+    }
+
     if (this.heartbeatId) {
       clearInterval(this.heartbeatId);
       this.heartbeatId = null;
     }
-    
+
     this.isRunning = false;
     
     // Освобождаем лок
