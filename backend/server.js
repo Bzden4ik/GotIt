@@ -2,6 +2,26 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 require('dotenv').config();
+
+// Sentry инициализация (перед любыми импортами!)
+const Sentry = require('@sentry/node');
+const { ProfilingIntegration } = require('@sentry/profiling-node');
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Sentry.Integrations.Express({ app: express() }),
+      new ProfilingIntegration(),
+    ],
+    tracesSampleRate: 0.1, // 10% транзакций
+    profilesSampleRate: 0.1, // 10% профилей
+  });
+  console.log('✅ Sentry инициализирован');
+}
+
 const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const Scheduler = require('./scheduler');
@@ -11,6 +31,12 @@ const { generateToken, authenticateToken, optionalAuth } = require('./middleware
 const app = express();
 const PORT = process.env.PORT || 3001;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+
+// Sentry: Request handler (должен быть ПЕРВЫМ middleware)
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
 
 // Middleware
 app.use(cors());
@@ -307,6 +333,11 @@ app.post('/webhook/telegram', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// === Sentry Error Handler (должен быть перед обычным error handler!) ===
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // === Обработчик ошибок (должен быть последним!) ===
 app.use(errorHandler);

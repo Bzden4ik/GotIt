@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAddStreamer, useCheckTracked } from '../services/apiHooks';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
 import TextDecode from '../components/TextDecode';
@@ -7,11 +9,15 @@ import './SearchPage.css';
 
 function SearchPage({ user }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // React Query mutation с оптимистичным обновлением
+  const addStreamer = useAddStreamer();
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -58,8 +64,8 @@ function SearchPage({ user }) {
     }
     
     try {
-      setLoading(true);
-      await apiService.addTrackedStreamer(streamer.nickname);
+      // Оптимистичное обновление - UI обновится мгновенно
+      await addStreamer.mutateAsync(streamer.nickname);
       
       // Обновляем статус в результатах поиска
       setSearchResults(prev => 
@@ -75,8 +81,6 @@ function SearchPage({ user }) {
       } else {
         setToast({ type: 'error', message: errorMsg });
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -145,8 +149,10 @@ function SearchPage({ user }) {
                 <button 
                   className={streamer.isTracked ? "track-btn tracked" : "track-btn"}
                   onClick={() => handleTrack(streamer)}
+                  disabled={addStreamer.isPending}
                 >
-                  {streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
+                  {addStreamer.isPending ? 'Добавление...' : 
+                   streamer.isTracked ? '✓ Отслеживается' : 'Отслеживать'}
                 </button>
               </div>
             ))}

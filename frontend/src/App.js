@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import SearchPage from './pages/SearchPage';
 import TrackedList from './pages/TrackedList';
 import BackgroundGradient from './components/BackgroundGradient';
@@ -7,6 +9,18 @@ import apiService from './services/api';
 import './App.css';
 
 const BOT_USERNAME = process.env.REACT_APP_TELEGRAM_BOT_USERNAME || '';
+
+// React Query Client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 минут
+      cacheTime: 10 * 60 * 1000, // 10 минут
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   const [user, setUser] = useState(null);
@@ -48,7 +62,8 @@ function App() {
       const response = await apiService.authTelegram(telegramUser);
       if (response.success && response.user) {
         setUser(response.user);
-        // Токен уже сохранён в apiService.authTelegram()
+        // Инвалидируем кеш при новой авторизации
+        queryClient.invalidateQueries();
       }
     } catch (err) {
       console.error('Ошибка авторизации:', err);
@@ -65,6 +80,8 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     apiService.clearToken();
+    // Очищаем кеш при выходе
+    queryClient.clear();
   };
 
   // Telegram Login Widget — вставляем скрипт
@@ -91,39 +108,46 @@ function App() {
   if (authLoading) return null;
 
   return (
-    <Router basename="/GotIt">
-      <BackgroundGradient />
-      <div className="app">
-        <header className="header">
-          <div className="container">
-            <h1 className="logo" href="https://bzden4ik.github.io/GotIt">GotIt</h1>
-            <nav className="nav">
-              <Link to="/" className="nav-link">Поиск</Link>
-              <Link to="/tracked" className="nav-link">Отслеживаю</Link>
-            </nav>
-            <div className="user-section">
-              {user ? (
-                <div className="user-logged">
-                  <span className="user-info">
-                    {user.username ? `@${user.username}` : user.firstName}
-                  </span>
-                  <button className="logout-btn" onClick={handleLogout}>Выйти</button>
-                </div>
-              ) : (
-                <TelegramWidget />
-              )}
+    <QueryClientProvider client={queryClient}>
+      <Router basename="/GotIt">
+        <BackgroundGradient />
+        <div className="app">
+          <header className="header">
+            <div className="container">
+              <h1 className="logo" href="https://bzden4ik.github.io/GotIt">GotIt</h1>
+              <nav className="nav">
+                <Link to="/" className="nav-link">Поиск</Link>
+                <Link to="/tracked" className="nav-link">Отслеживаю</Link>
+              </nav>
+              <div className="user-section">
+                {user ? (
+                  <div className="user-logged">
+                    <span className="user-info">
+                      {user.username ? `@${user.username}` : user.firstName}
+                    </span>
+                    <button className="logout-btn" onClick={handleLogout}>Выйти</button>
+                  </div>
+                ) : (
+                  <TelegramWidget />
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<SearchPage user={user} />} />
-            <Route path="/tracked" element={<TrackedList user={user} />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+          <main className="main">
+            <Routes>
+              <Route path="/" element={<SearchPage user={user} />} />
+              <Route path="/tracked" element={<TrackedList user={user} />} />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+      
+      {/* React Query DevTools (только в dev) */}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
+    </QueryClientProvider>
   );
 }
 

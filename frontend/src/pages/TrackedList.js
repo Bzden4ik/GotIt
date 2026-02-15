@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import apiService from '../services/api';
+import React, { useState } from 'react';
+import { useTrackedStreamers, useRemoveStreamer } from '../services/apiHooks';
 import WishlistModal from '../components/WishlistModal';
 import ConfirmModal from '../components/ConfirmModal';
 import Toast from '../components/Toast';
@@ -7,34 +7,15 @@ import TextDecode from '../components/TextDecode';
 import './TrackedList.css';
 
 function TrackedList({ user }) {
-  const [trackedStreamers, setTrackedStreamers] = useState([]);
   const [selectedStreamer, setSelectedStreamer] = useState(null);
   const [streamerToDelete, setStreamerToDelete] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
-    if (user) {
-      loadTrackedStreamers();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const loadTrackedStreamers = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getTrackedStreamers();
-      if (response.success) {
-        setTrackedStreamers(response.streamers);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // React Query: автоматическое кеширование + рефетч
+  const { data: trackedStreamers = [], isLoading, error } = useTrackedStreamers(!!user);
+  
+  // React Query mutation с оптимистичным обновлением
+  const removeStreamer = useRemoveStreamer();
 
   const handleRemove = async (streamerId) => {
     setStreamerToDelete(streamerId);
@@ -44,8 +25,8 @@ function TrackedList({ user }) {
     if (!streamerToDelete) return;
     
     try {
-      await apiService.removeTrackedStreamer(streamerToDelete);
-      setTrackedStreamers(prev => prev.filter(s => s.id !== streamerToDelete));
+      // Оптимистичное удаление - UI обновится мгновенно
+      await removeStreamer.mutateAsync(streamerToDelete);
       setToast({ type: 'success', message: 'Стример удален из отслеживаемых' });
     } catch (err) {
       setToast({ type: 'error', message: err.message || 'Ошибка при удалении' });
@@ -71,7 +52,7 @@ function TrackedList({ user }) {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="tracked-list">
         <div className="container bvl">
@@ -87,7 +68,7 @@ function TrackedList({ user }) {
       <div className="tracked-list">
         <div className="container bvl">
           <TextDecode text="Отслеживаемые" as="h2" className="page-title" delay={200} duration={1000} />
-          <div className="error-message">{error}</div>
+          <div className="error-message">{error.message}</div>
         </div>
       </div>
     );
@@ -106,7 +87,10 @@ function TrackedList({ user }) {
         ) : (
           <div className="streamers-grid">
             {trackedStreamers.map((streamer) => (
-              <div key={streamer.id} className="streamer-card">
+              <div 
+                key={streamer.id} 
+                className={`streamer-card ${streamer.isOptimistic ? 'optimistic' : ''}`}
+              >
                 {streamer.avatar && (
                   <img 
                     src={streamer.avatar} 
@@ -126,14 +110,16 @@ function TrackedList({ user }) {
                   <button 
                     className="view-btn"
                     onClick={() => handleViewWishlist(streamer)}
+                    disabled={streamer.isOptimistic}
                   >
                     Вишлист
                   </button>
                   <button 
                     className="remove-btn"
                     onClick={() => handleRemove(streamer.id)}
+                    disabled={removeStreamer.isPending}
                   >
-                    Удалить
+                    {removeStreamer.isPending ? 'Удаление...' : 'Удалить'}
                   </button>
                 </div>
               </div>
