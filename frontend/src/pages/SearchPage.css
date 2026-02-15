@@ -9,11 +9,25 @@
   margin-bottom: 12px;
 }
 
+/* ── Wrapper: subtitle + form appear after title animation ── */
+.search-below {
+  width: 100%;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  pointer-events: none;
+}
+.search-below--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .page-subtitle {
   font-size: 18px;
   color: var(--dim);
   margin-bottom: 52px;
-  animation: fadeUp 0.7s var(--ease) 0.4s both;
+  text-align: center;
 }
 
 /* ── Search Bar ── */
@@ -25,7 +39,6 @@
   border: 1px solid var(--line);
   background: var(--surface);
   transition: border-color 0.35s, box-shadow 0.35s;
-  animation: fadeUp 0.6s var(--ease);
 }
 .search-form:focus-within {
   border-color: var(--line-hover);

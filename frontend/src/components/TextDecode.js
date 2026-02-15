@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-function TextDecode({ text, as: Tag = 'span', className = '', delay = 0, duration = 1200 }) {
+function TextDecode({ text, as: Tag = 'span', className = '', delay = 0, duration = 1200, onComplete }) {
   const [display, setDisplay] = useState('');
   const [started, setStarted] = useState(false);
   const ref = useRef(null);
   const frameRef = useRef(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   const animate = useCallback(() => {
     const chars = text.split('');
@@ -41,6 +43,7 @@ function TextDecode({ text, as: Tag = 'span', className = '', delay = 0, duratio
         frameRef.current = requestAnimationFrame(tick);
       } else {
         setDisplay(text);
+        if (onCompleteRef.current) onCompleteRef.current();
       }
     };
 

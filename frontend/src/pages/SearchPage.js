@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAddStreamer } from '../services/apiHooks';
 import apiService from '../services/api';
@@ -14,6 +14,9 @@ function SearchPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [titleDone, setTitleDone] = useState(false);
+
+  const handleTitleComplete = useCallback(() => setTitleDone(true), []);
 
   // React Query mutation с оптимистичным обновлением
   const addStreamer = useAddStreamer();
@@ -87,21 +90,24 @@ function SearchPage({ user }) {
   return (
     <div className="search-page">
       <div className="container bvl">
-        <TextDecode text="Найти стримера" as="h2" className="page-title" delay={200} duration={1000} />
-        <p className="page-subtitle">Введите никнейм, чтобы увидеть вишлист</p>
-        
-        <form onSubmit={handleSearch} className="search-form">
-          <input
-            type="text"
-            placeholder="Введите ник стримера..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-          <button type="submit" className="search-btn" disabled={loading}>
-            {loading ? 'Поиск...' : 'Найти'}
-          </button>
-        </form>
+        <TextDecode text="Найти стримера" as="h2" className="page-title" delay={200} duration={1000} onComplete={handleTitleComplete} />
+
+        <div className={`search-below ${titleDone ? 'search-below--visible' : ''}`}>
+          <p className="page-subtitle">Введите никнейм, чтобы увидеть вишлист</p>
+
+          <form onSubmit={handleSearch} className="search-form">
+            <input
+              type="text"
+              placeholder="Введите ник стримера..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            <button type="submit" className="search-btn" disabled={loading}>
+              {loading ? 'Поиск...' : 'Найти'}
+            </button>
+          </form>
+        </div>
 
         {error && (
           <div className="error-message">
