@@ -41,3 +41,27 @@
   transition: color 0.2s;
 }
 .toast-close:hover { color: var(--white); }
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+    min-width: unset;
+    max-width: unset;
+    padding: 14px 16px;
+  }
+  .toast-message { font-size: 13px; }
+}
+
+/* ── Small phones ── */
+@media (max-width: 380px) {
+  .toast {
+    left: 8px;
+    right: 8px;
+    bottom: 12px;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+}

@@ -187,9 +187,39 @@
   box-shadow: 0 0 28px var(--cyan-glow);
 }
 
+/* ── Tablet ── */
+@media (max-width: 768px) {
+  .wishlist-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .modal-content { max-height: 90vh; }
+  .modal-header { padding: 20px 22px; }
+  .streamer-info-header h2 { font-size: 18px; }
+}
+
+/* ── Mobile ── */
 @media (max-width: 600px) {
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal-content {
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .modal-header { padding: 16px; }
+  .streamer-avatar-small { width: 40px; height: 40px; }
+  .streamer-info-header h2 { font-size: 17px; }
+  .streamer-info-header .username { font-size: 13px; }
+  .streamer-info-header { gap: 10px; }
+  .modal-body { padding: 12px; }
   .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .modal-content { max-height: 94vh; }
-  .modal-body { padding: 18px; }
-  .item-info { padding: 14px; }
+  .item-info { padding: 12px; }
+  .item-price { font-size: 17px; }
+  .item-name { font-size: 13px; }
+  .item-buttons { gap: 6px; }
+  .item-link { padding: 7px 12px; font-size: 12px; }
+  .modal-footer { padding: 12px 16px; }
+  .fetta-link { padding: 12px 24px; font-size: 14px; }
+}
+
+/* ── Small phones ── */
+@media (max-width: 380px) {
+  .wishlist-grid { grid-template-columns: 1fr; }
+  .modal-content { max-height: 95vh; }
 }

@@ -18,9 +18,8 @@
 .hint { font-size: 15px; color: var(--ghost); }
 
 .streamers-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 22px;
   animation: fadeUp 0.6s var(--ease) 0.2s both;
 }
@@ -125,9 +124,35 @@
   background: rgba(251,113,133,0.04);
 }
 
+/* ── Tablet ── */
+@media (max-width: 768px) {
+  .streamers-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .streamer-card { padding: 24px; }
+  .streamer-avatar { width: 72px; height: 72px; }
+}
+
+/* ── Mobile ── */
 @media (max-width: 600px) {
-  .streamers-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .streamer-card { padding: 22px; }
-  .streamer-avatar { width: 68px; height: 68px; }
-  .view-btn, .remove-btn { font-size: 13px; padding: 12px 0; }
+  .streamers-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .streamer-card { padding: 18px; gap: 12px; }
+  .streamer-avatar { width: 56px; height: 56px; }
+  .streamer-info h3 { font-size: 16px; }
+  .username { font-size: 13px; margin-bottom: 6px; }
+  .items-count { padding: 4px 12px; font-size: 12px; }
+  .card-actions { gap: 8px; }
+  .view-btn, .remove-btn { font-size: 13px; padding: 11px 0; }
+}
+
+/* ── Small phones — single column ── */
+@media (max-width: 380px) {
+  .streamers-grid { grid-template-columns: 1fr; gap: 12px; }
+  .streamer-card {
+    flex-direction: row;
+    flex-wrap: wrap;
+    text-align: left;
+    padding: 16px;
+  }
+  .streamer-info { align-items: flex-start; }
+  .streamer-avatar { width: 52px; height: 52px; }
+  .streamer-info h3 { font-size: 15px; }
 }

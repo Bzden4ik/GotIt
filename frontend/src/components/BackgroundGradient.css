@@ -79,3 +79,12 @@
   40%      { transform: translate(50px,-45px) scale(1.1); }
   70%      { transform: translate(-40px,35px) scale(0.9); }
 }
+
+/* ── Mobile: reduce background effects for performance ── */
+@media (max-width: 600px) {
+  .bg-ribbon--1 { width: 400px; height: 100px; }
+  .bg-ribbon--2 { width: 350px; height: 90px; }
+  .bg-ribbon--3 { width: 300px; height: 70px; }
+  .bg-orb--1 { width: 250px; height: 250px; }
+  .bg-orb--2 { width: 200px; height: 200px; }
+}

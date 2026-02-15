@@ -148,8 +148,40 @@
   box-shadow: 0 0 20px rgba(52,211,153,0.15);
 }
 
+/* ── Tablet ── */
+@media (max-width: 768px) {
+  .page-subtitle { font-size: 16px; margin-bottom: 36px; }
+  .search-form { margin-bottom: 40px; }
+  .search-input { padding: 18px 20px; font-size: 16px; }
+  .search-btn { padding: 18px 28px; font-size: 15px; }
+  .streamer-card { padding: 24px; gap: 18px; }
+  .streamer-avatar { width: 72px; height: 72px; }
+  .streamer-info h3 { font-size: 20px; }
+}
+
+/* ── Mobile ── */
 @media (max-width: 600px) {
-  .streamer-card { flex-direction: column; text-align: center; padding: 24px; }
-  .search-input { padding: 20px 20px; font-size: 17px; }
-  .search-btn { padding: 20px 28px; font-size: 15px; }
+  .streamer-card { flex-direction: column; text-align: center; padding: 24px; gap: 16px; }
+  .streamer-avatar { width: 80px; height: 80px; }
+  .social-links { justify-content: center; }
+  .track-btn { width: 100%; }
+  .search-form { flex-direction: column; border-radius: var(--r); }
+  .search-input { padding: 18px 18px; font-size: 16px; border-bottom: 1px solid var(--line); }
+  .search-btn {
+    padding: 16px 28px;
+    font-size: 15px;
+    border-radius: 0 0 var(--r) var(--r);
+  }
+  .page-subtitle { font-size: 15px; margin-bottom: 28px; }
+}
+
+/* ── Small phones ── */
+@media (max-width: 380px) {
+  .search-input { padding: 16px 14px; font-size: 15px; }
+  .search-btn { padding: 14px 20px; font-size: 14px; }
+  .streamer-card { padding: 18px; }
+  .streamer-avatar { width: 64px; height: 64px; }
+  .streamer-info h3 { font-size: 18px; }
+  .description { font-size: 14px; }
+  .track-btn { padding: 14px 24px; font-size: 15px; }
 }

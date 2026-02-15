@@ -69,3 +69,23 @@
   filter: brightness(1.12);
   box-shadow: 0 0 18px rgba(251,113,133,0.25);
 }
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .confirm-modal-overlay { padding: 12px; }
+  .confirm-modal-content { max-width: 100%; }
+  .confirm-modal-header { padding: 20px 20px 10px; }
+  .confirm-modal-header h3 { font-size: 17px; }
+  .confirm-modal-body { padding: 6px 20px 18px; }
+  .confirm-modal-body p { font-size: 14px; }
+  .confirm-modal-footer {
+    padding: 0 20px 20px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .confirm-btn-cancel, .confirm-btn-confirm {
+    width: 100%;
+    text-align: center;
+    padding: 13px 22px;
+  }
+}
