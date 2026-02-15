@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const crypto = require('crypto');
 require('dotenv').config();
 
@@ -39,7 +40,31 @@ if (process.env.SENTRY_DSN) {
 }
 
 // Middleware
-app.use(cors());
+
+// Helmet — security headers (XSS protection, HSTS, no-sniff, etc.)
+app.use(helmet({
+  contentSecurityPolicy: false, // Отключаем CSP (API-сервер, не отдаёт HTML)
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS — ограничиваем допустимые origins
+const allowedOrigins = [
+  'https://bzden4ik.github.io',          // GitHub Pages (production)
+  process.env.FRONTEND_URL,               // Из переменных окружения (если задан)
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Разрешаем запросы без origin (Telegram webhook, curl, health checks)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`⚠ CORS заблокирован origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
+
 app.use(express.json({ limit: '1mb' })); // Ограничение размера body
 app.use(rateLimit({ maxRequests: 100, windowMs: 60 * 1000 })); // 100 запросов в минуту
 
@@ -63,6 +88,59 @@ function verifyTelegramAuth(data) {
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend работает!', timestamp: new Date().toISOString() });
 });
+
+// Health check — для мониторинга и uptime-сервисов
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+    checks: {}
+  };
+
+  // Проверка БД (используем реальный запрос через db)
+  try {
+    const start = Date.now();
+    await db.getUserById(0); // Лёгкий SELECT, вернёт null но проверит соединение
+    health.checks.database = { status: 'ok', responseTime: Date.now() - start + 'ms' };
+  } catch (error) {
+    health.checks.database = { status: 'error', error: error.message };
+    health.status = 'degraded';
+  }
+
+  // Проверка парсера (пингуем Fetta)
+  try {
+    const start = Date.now();
+    const axios = require('axios');
+    const response = await axios.get('https://fetta.app', { timeout: 5000, maxRedirects: 2 });
+    health.checks.fetta = {
+      status: response.status === 200 ? 'ok' : 'warning',
+      responseTime: Date.now() - start + 'ms',
+      httpStatus: response.status
+    };
+  } catch (error) {
+    health.checks.fetta = { status: 'error', error: error.message };
+    health.status = 'degraded';
+  }
+
+  // Статус планировщика
+  if (schedulerRef) {
+    health.checks.scheduler = {
+      status: schedulerRef.isRunning ? 'running' : 'stopped',
+      hasLock: schedulerRef.hasLock,
+      isChecking: schedulerRef.isChecking,
+      id: schedulerRef.schedulerId
+    };
+  } else {
+    health.checks.scheduler = { status: 'not_initialized' };
+  }
+
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
+});
+
+// Ссылка на планировщик для health check
+let schedulerRef = null;
 
 // === Авторизация ===
 app.post('/api/auth/telegram', async (req, res) => {
@@ -363,9 +441,9 @@ async function startServer() {
         }
       }
 
-      const scheduler = new Scheduler(BOT_TOKEN);
+      schedulerRef = new Scheduler(BOT_TOKEN);
       const checkInterval = parseInt(process.env.CHECK_INTERVAL) || 30;
-      scheduler.start(checkInterval);
+      schedulerRef.start(checkInterval);
       console.log(`✅ Планировщик настроен на проверку каждые ${checkInterval} секунд`);
     });
   } catch (error) {
