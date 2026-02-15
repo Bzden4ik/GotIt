@@ -4,6 +4,7 @@ import { useAddStreamer } from '../services/apiHooks';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
 import TextDecode from '../components/TextDecode';
+import SearchLoader from '../components/SearchLoader';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -23,7 +24,8 @@ function SearchPage({ user }) {
 
     setLoading(true);
     setError(null);
-    
+    setSearchResults([]);
+
     try {
       const response = await apiService.searchStreamer(searchQuery.trim());
       
@@ -107,7 +109,11 @@ function SearchPage({ user }) {
           </div>
         )}
 
-        {searchResults.length > 0 && (
+        {loading && (
+          <SearchLoader nickname={searchQuery.trim()} />
+        )}
+
+        {!loading && searchResults.length > 0 && (
           <div className="search-results">
             {searchResults.map((streamer, index) => (
               <div key={index} className="streamer-card">

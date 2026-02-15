@@ -62,7 +62,7 @@ function TextDecode({ text, as: Tag = 'span', className = '', delay = 0, duratio
 
   return (
     <Tag ref={ref} className={className} style={{ visibility: started ? 'visible' : 'hidden' }}>
-      {display || '\u00A0'}
+      {display || text}
     </Tag>
   );
 }
