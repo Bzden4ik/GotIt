@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAddStreamer, useCheckTracked } from '../services/apiHooks';
+import { useAddStreamer } from '../services/apiHooks';
 import apiService from '../services/api';
 import Toast from '../components/Toast';
 import TextDecode from '../components/TextDecode';
@@ -9,7 +8,6 @@ import './SearchPage.css';
 
 function SearchPage({ user }) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
