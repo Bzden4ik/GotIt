@@ -93,6 +93,12 @@ class DatabaseService {
         FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
         UNIQUE(user_id, group_id)
       )`,
+      `CREATE TABLE IF NOT EXISTS scheduler_lock (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        instance_id TEXT NOT NULL,
+        acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
       `CREATE INDEX IF NOT EXISTS idx_user_streamers_user ON user_streamers(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_user_streamers_streamer ON user_streamers(streamer_id)`,
       `CREATE INDEX IF NOT EXISTS idx_wishlist_streamer ON wishlist_items(streamer_id)`,
@@ -221,15 +227,26 @@ class DatabaseService {
   }
 
   async getTrackedStreamers(userId) {
+    // Оптимизированный запрос с JOIN - получаем стримеров И количество товаров за 1 запрос
     const rs = await this.db.execute({
-      sql: `SELECT s.*, us.created_at as tracked_at
+      sql: `SELECT 
+              s.*,
+              us.created_at as tracked_at,
+              COUNT(wi.id) as items_count
             FROM streamers s
             JOIN user_streamers us ON s.id = us.streamer_id
+            LEFT JOIN wishlist_items wi ON s.id = wi.streamer_id
             WHERE us.user_id = ?
+            GROUP BY s.id, us.created_at
             ORDER BY us.created_at DESC`,
       args: [userId]
     });
-    return rs.rows;
+    
+    // Преобразуем items_count из string в number
+    return rs.rows.map(row => ({
+      ...row,
+      itemsCount: parseInt(row.items_count) || 0
+    }));
   }
 
   async isStreamerTracked(userId, streamerId) {
@@ -548,6 +565,95 @@ class DatabaseService {
       args: [streamerId]
     });
     return rs.rows;
+  }
+
+  // ── Distributed Lock для планировщика ──
+
+  /**
+   * Попытка захватить лок планировщика
+   * @returns {boolean} true если лок захвачен
+   */
+  async tryAcquireSchedulerLock(instanceId) {
+    try {
+      // Проверяем существующий лок
+      const existing = await this.db.execute({
+        sql: 'SELECT * FROM scheduler_lock WHERE id = 1',
+        args: []
+      });
+
+      const now = new Date();
+      const lockTimeout = 60 * 1000; // 60 секунд
+
+      if (existing.rows.length > 0) {
+        const lock = existing.rows[0];
+        const lastHeartbeat = new Date(lock.last_heartbeat);
+        
+        // Если лок устарел (нет heartbeat >60 сек) - освобождаем
+        if (now - lastHeartbeat > lockTimeout) {
+          console.log(`🔓 Лок устарел (instance: ${lock.instance_id}), захватываем`);
+          await this.db.execute({
+            sql: `UPDATE scheduler_lock SET 
+                  instance_id = ?, 
+                  acquired_at = CURRENT_TIMESTAMP,
+                  last_heartbeat = CURRENT_TIMESTAMP 
+                  WHERE id = 1`,
+            args: [instanceId]
+          });
+          return true;
+        }
+
+        // Если это наш лок - обновляем heartbeat
+        if (lock.instance_id === instanceId) {
+          await this.db.execute({
+            sql: 'UPDATE scheduler_lock SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = 1',
+            args: []
+          });
+          return true;
+        }
+
+        // Лок занят другим инстансом
+        return false;
+      }
+
+      // Лока нет - создаём
+      await this.db.execute({
+        sql: 'INSERT INTO scheduler_lock (id, instance_id) VALUES (1, ?)',
+        args: [instanceId]
+      });
+      return true;
+    } catch (error) {
+      console.error('Ошибка при захвате лока:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Освободить лок планировщика
+   */
+  async releaseSchedulerLock(instanceId) {
+    try {
+      await this.db.execute({
+        sql: 'DELETE FROM scheduler_lock WHERE id = 1 AND instance_id = ?',
+        args: [instanceId]
+      });
+      console.log('🔓 Лок освобождён');
+    } catch (error) {
+      console.error('Ошибка при освобождении лока:', error);
+    }
+  }
+
+  /**
+   * Обновить heartbeat лока
+   */
+  async updateSchedulerHeartbeat(instanceId) {
+    try {
+      await this.db.execute({
+        sql: 'UPDATE scheduler_lock SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = 1 AND instance_id = ?',
+        args: [instanceId]
+      });
+    } catch (error) {
+      // Игнорируем ошибки heartbeat
+    }
   }
 }
 

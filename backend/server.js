@@ -164,13 +164,9 @@ app.get('/api/tracked', authenticateToken, async (req, res) => {
   const userId = req.user.id; // Из JWT токена!
   
   try {
+    // Оптимизированный запрос - получаем всё за 1 SQL запрос (с JOIN)
     const streamers = await db.getTrackedStreamers(userId);
-    const result = [];
-    for (const s of streamers) {
-      const items = await db.getWishlistItems(s.id);
-      result.push({ ...s, itemsCount: items.length });
-    }
-    res.json({ success: true, streamers: result });
+    res.json({ success: true, streamers });
   } catch (error) {
     console.error('Ошибка при получении отслеживаемых:', error);
     res.status(500).json({ success: false, error: 'Ошибка при получении списка' });

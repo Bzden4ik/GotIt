@@ -19,14 +19,15 @@ class Scheduler {
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
     this.intervalId = null;
-    this.lastNotifications = new Map(); // Для будущего использования
+    this.heartbeatId = null;
+    this.hasLock = false;
     
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
     
     globalSchedulerInstance = this;
   }
 
-  start(intervalSeconds = 30) {
+  async start(intervalSeconds = 30) {
     if (this.isRunning) { 
       console.log('⚠ Планировщик уже запущен, пропускаем повторный запуск');
       return; 
@@ -34,6 +35,36 @@ class Scheduler {
     
     console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 3:00 МСК (ночью)`);
     
+    // Пытаемся захватить лок
+    this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
+    
+    if (!this.hasLock) {
+      console.log('⚠ Лок занят другим инстансом, планировщик не запущен');
+      console.log('💡 Если это единственный инстанс, лок освободится через 60 сек');
+      
+      // Пробуем захватить лок каждые 30 секунд
+      this.intervalId = setInterval(async () => {
+        this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
+        if (this.hasLock) {
+          console.log('🔒 Лок захвачен! Запускаем проверки...');
+          this.startChecks(intervalSeconds);
+        }
+      }, 30000);
+      
+      return;
+    }
+    
+    console.log('🔒 Лок захвачен успешно');
+    this.startChecks(intervalSeconds);
+  }
+
+  startChecks(intervalSeconds) {
+    // Heartbeat каждые 20 секунд
+    this.heartbeatId = setInterval(async () => {
+      await db.updateSchedulerHeartbeat(this.schedulerId);
+    }, 20000);
+    
+    // Основной цикл проверки
     this.intervalId = setInterval(async () => {
       if (this.isWithinWorkingHours()) {
         await this.checkAllStreamers();
@@ -54,13 +85,26 @@ class Scheduler {
     }, 10000);
   }
 
-  stop() {
+  async stop() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      this.isRunning = false;
-      console.log('✓ Планировщик остановлен');
     }
+    
+    if (this.heartbeatId) {
+      clearInterval(this.heartbeatId);
+      this.heartbeatId = null;
+    }
+    
+    this.isRunning = false;
+    
+    // Освобождаем лок
+    if (this.hasLock) {
+      await db.releaseSchedulerLock(this.schedulerId);
+      this.hasLock = false;
+    }
+    
+    console.log('✓ Планировщик остановлен');
   }
 
   isWithinWorkingHours() {
