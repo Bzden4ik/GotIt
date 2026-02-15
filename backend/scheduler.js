@@ -18,6 +18,7 @@ class Scheduler {
     this.schedulerId = Math.random().toString(36).substring(7); // Уникальный ID
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
+    this.isChecking = false; // НОВЫЙ флаг для предотвращения параллельных проверок
     this.intervalId = null;
     this.heartbeatId = null;
     this.hasLock = false;
@@ -118,12 +119,24 @@ class Scheduler {
   }
 
   async checkAllStreamers() {
-    console.log('\n=== Начало проверки стримеров ===');
-    console.log(`Время: ${new Date().toLocaleString('ru-RU')}`);
-    console.log(`Планировщик ID: ${this.schedulerId || 'legacy'}`);
+    // ЗАЩИТА: Если уже выполняется проверка - пропускаем
+    if (this.isChecking) {
+      console.log('⚠ Проверка уже выполняется, пропускаем...');
+      return;
+    }
+    
+    this.isChecking = true; // Устанавливаем флаг
+    
     try {
+      console.log('\n=== Начало проверки стримеров ===');
+      console.log(`Время: ${new Date().toLocaleString('ru-RU')}`);
+      console.log(`Планировщик ID: ${this.schedulerId || 'legacy'}`);
+      
       const streamers = await db.getAllTrackedStreamers();
-      if (streamers.length === 0) { console.log('Нет отслеживаемых стримеров'); return; }
+      if (streamers.length === 0) { 
+        console.log('Нет отслеживаемых стримеров'); 
+        return; 
+      }
       
       // Убираем дубли по nickname (case-insensitive)
       const uniqueStreamers = [];
@@ -146,14 +159,16 @@ class Scheduler {
         
         // КРИТИЧНО: Длинная задержка между стримерами (10-15 секунд)
         if (uniqueStreamers.indexOf(streamer) < uniqueStreamers.length - 1) {
-          const delay = 10000 + Math.random() * 5000; // 10-15 секунд (было 5-8)
-          console.log(`  ⏳ Пауза ${Math.round(delay/1000)}с перед следующим стримером...\n`);
-          await this.sleep(delay);
+          const delay = 10000 + Math.random() * 5000; // 10-15 секунд
+          console.log(`  ⏳ Пауза ${Math.round(delay/1000)}с перед следующим стримером...`);
+          await this.sleep(delay); // ВАЖНО: await обязательно!
         }
       }
       console.log('=== Проверка завершена ===\n');
     } catch (error) {
       console.error('Ошибка при проверке стримеров:', error);
+    } finally {
+      this.isChecking = false; // Снимаем флаг ВСЕГДА
     }
   }
 
