@@ -24,7 +24,7 @@
 }
 
 .page-subtitle {
-  text-align: left;
+  text-align: center;
   font-size: 18px;
   color: var(--dim);
   margin-bottom: 52px;
@@ -163,7 +163,7 @@
 
 /* ── Tablet ── */
 @media (max-width: 768px) {
-  .page-subtitle { font-size: 16px; margin-bottom: 36px; }
+  .page-subtitle { font-size: 16px; margin-bottom: 36px; text-align: left;}
   .search-form { margin-bottom: 40px; }
   .search-input { padding: 18px 20px; font-size: 16px; }
   .search-btn { padding: 18px 28px; font-size: 15px; }
@@ -185,7 +185,7 @@
     font-size: 15px;
     border-radius: 0 0 var(--r) var(--r);
   }
-  .page-subtitle { font-size: 15px; margin-bottom: 28px; }
+  .page-subtitle { font-size: 15px; margin-bottom: 28px; text-align: left;}
 }
 
 /* ── Small phones ── */
