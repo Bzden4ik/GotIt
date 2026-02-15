@@ -12,34 +12,30 @@ function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Восстановление сессии из localStorage
+  // Восстановление сессии из JWT токена
   useEffect(() => {
     const checkSession = async () => {
-      const saved = localStorage.getItem('gotit_user');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          
-          // Проверяем существование пользователя в БД
-          try {
-            const response = await apiService.checkUser(parsed.id);
-            if (response.success && response.user) {
-              setUser(response.user);
-              apiService.setUserId(response.user.id);
-            } else {
-              // Пользователь не найден в БД - требуется переавторизация
-              localStorage.removeItem('gotit_user');
-              console.log('Требуется переавторизация');
-            }
-          } catch (err) {
-            // Ошибка проверки - очищаем данные
-            localStorage.removeItem('gotit_user');
-            console.error('Ошибка проверки пользователя:', err);
-          }
-        } catch (e) {
-          localStorage.removeItem('gotit_user');
-        }
+      // Проверяем есть ли токен
+      if (!apiService.isAuthenticated()) {
+        setAuthLoading(false);
+        return;
       }
+
+      try {
+        // Проверяем токен через API
+        const response = await apiService.checkUser();
+        if (response.success && response.user) {
+          setUser(response.user);
+        } else {
+          // Токен невалидный - очищаем
+          apiService.clearToken();
+        }
+      } catch (err) {
+        console.error('Ошибка проверки токена:', err);
+        // Токен невалидный или истёк - очищаем
+        apiService.clearToken();
+      }
+      
       setAuthLoading(false);
     };
     
@@ -52,8 +48,7 @@ function App() {
       const response = await apiService.authTelegram(telegramUser);
       if (response.success && response.user) {
         setUser(response.user);
-        apiService.setUserId(response.user.id);
-        localStorage.setItem('gotit_user', JSON.stringify(response.user));
+        // Токен уже сохранён в apiService.authTelegram()
       }
     } catch (err) {
       console.error('Ошибка авторизации:', err);
@@ -69,8 +64,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    apiService.setUserId(null);
-    localStorage.removeItem('gotit_user');
+    apiService.clearToken();
   };
 
   // Telegram Login Widget — вставляем скрипт

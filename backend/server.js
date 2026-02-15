@@ -6,6 +6,7 @@ const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const Scheduler = require('./scheduler');
 const { errorHandler, rateLimit, asyncHandler } = require('./middleware/security');
+const { generateToken, authenticateToken, optionalAuth } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,10 +50,20 @@ app.post('/api/auth/telegram', async (req, res) => {
   try {
     await db.createUser(telegramData.id, telegramData.username || '', telegramData.first_name || '');
     const user = await db.getUserByTelegramId(telegramData.id);
+    
+    // Генерируем JWT токен
+    const token = generateToken(user.id, user.telegram_id);
+    
     console.log(`Авторизован: ${user.username} (tg: ${user.telegram_id})`);
     res.json({
       success: true,
-      user: { id: user.id, telegramId: user.telegram_id, username: user.username, firstName: user.first_name }
+      token: token,
+      user: { 
+        id: user.id, 
+        telegramId: user.telegram_id, 
+        username: user.username, 
+        firstName: user.first_name 
+      }
     });
   } catch (error) {
     console.error('Ошибка авторизации:', error);
@@ -60,16 +71,25 @@ app.post('/api/auth/telegram', async (req, res) => {
   }
 });
 
-// Проверка пользователя
-app.get('/api/auth/check', async (req, res) => {
-  const { userId } = req.query;
-  if (!userId) return res.status(400).json({ success: false, error: 'userId не указан' });
+// Проверка пользователя (теперь через токен)
+app.get('/api/auth/check', authenticateToken, async (req, res) => {
   try {
-    const user = await db.getUserById(parseInt(userId));
-    if (!user) return res.status(404).json({ success: false, error: 'Пользователь не найден', needReauth: true });
+    const user = await db.getUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Пользователь не найден', 
+        needAuth: true 
+      });
+    }
     res.json({
       success: true,
-      user: { id: user.id, telegramId: user.telegram_id, username: user.username, firstName: user.first_name }
+      user: { 
+        id: user.id, 
+        telegramId: user.telegram_id, 
+        username: user.username, 
+        firstName: user.first_name 
+      }
     });
   } catch (error) {
     console.error('Ошибка проверки:', error);
@@ -77,7 +97,7 @@ app.get('/api/auth/check', async (req, res) => {
   }
 });
 
-// Поиск стримера
+// Поиск стримера (не требует авторизации)
 app.get('/api/streamer/search', async (req, res) => {
   const { nickname } = req.query;
   if (!nickname) return res.status(400).json({ error: 'Необходимо указать nickname' });
@@ -92,11 +112,12 @@ app.get('/api/streamer/search', async (req, res) => {
   }
 });
 
-// Добавить стримера в отслеживаемые
-app.post('/api/tracked', async (req, res) => {
-  const { nickname, userId } = req.body;
+// Добавить стримера в отслеживаемые (требует авторизации)
+app.post('/api/tracked', authenticateToken, async (req, res) => {
+  const { nickname } = req.body;
+  const userId = req.user.id; // Из JWT токена!
+  
   if (!nickname) return res.status(400).json({ error: 'Необходимо указать nickname' });
-  if (!userId) return res.status(401).json({ error: 'Необходимо авторизоваться' });
 
   try {
     const existingStreamer = await db.getStreamerByNickname(nickname);
@@ -104,7 +125,11 @@ app.post('/api/tracked', async (req, res) => {
       const isTracked = await db.isStreamerTracked(userId, existingStreamer.id);
       if (isTracked) {
         const items = await db.getWishlistItems(existingStreamer.id);
-        return res.json({ success: true, streamer: { ...existingStreamer, itemsCount: items.length }, message: 'Стример уже в отслеживаемых' });
+        return res.json({ 
+          success: true, 
+          streamer: { ...existingStreamer, itemsCount: items.length }, 
+          message: 'Стример уже в отслеживаемых' 
+        });
       }
       await db.addTrackedStreamer(userId, existingStreamer.id);
       const items = await db.getWishlistItems(existingStreamer.id);
@@ -115,9 +140,12 @@ app.post('/api/tracked', async (req, res) => {
     if (!result.success) return res.status(404).json({ success: false, error: result.error });
 
     const streamer = await db.createOrUpdateStreamer({
-      nickname: result.profile.nickname, name: result.profile.name,
-      username: result.profile.username, avatar: result.profile.avatar,
-      description: result.profile.description, fettaUrl: result.profile.fettaUrl
+      nickname: result.profile.nickname, 
+      name: result.profile.name,
+      username: result.profile.username, 
+      avatar: result.profile.avatar,
+      description: result.profile.description, 
+      fettaUrl: result.profile.fettaUrl
     });
 
     if (result.wishlist && result.wishlist.length > 0) {
@@ -127,17 +155,14 @@ app.post('/api/tracked', async (req, res) => {
     res.json({ success: true, streamer: { ...streamer, itemsCount: result.wishlist.length } });
   } catch (error) {
     console.error('Ошибка при добавлении:', error);
-    if (error.message && error.message.includes('не найден в базе данных')) {
-      return res.status(401).json({ success: false, error: 'Сессия устарела. Войдите заново через Telegram', needReauth: true });
-    }
     res.status(500).json({ success: false, error: error.message || 'Ошибка при добавлении стримера' });
   }
 });
 
-// Список отслеживаемых
-app.get('/api/tracked', async (req, res) => {
-  const { userId } = req.query;
-  if (!userId) return res.status(401).json({ success: false, error: 'Необходимо авторизоваться' });
+// Список отслеживаемых (требует авторизации)
+app.get('/api/tracked', authenticateToken, async (req, res) => {
+  const userId = req.user.id; // Из JWT токена!
+  
   try {
     const streamers = await db.getTrackedStreamers(userId);
     const result = [];
@@ -152,11 +177,13 @@ app.get('/api/tracked', async (req, res) => {
   }
 });
 
-// Проверка отслеживания
-app.get('/api/tracked/check/:nickname', async (req, res) => {
+// Проверка отслеживания (опциональная авторизация)
+app.get('/api/tracked/check/:nickname', optionalAuth, async (req, res) => {
   const { nickname } = req.params;
-  const { userId } = req.query;
+  const userId = req.user?.id; // Может быть null если не авторизован
+  
   if (!userId) return res.json({ success: true, isTracked: false });
+  
   try {
     const streamer = await db.getStreamerByNickname(nickname);
     if (!streamer) return res.json({ success: true, isTracked: false });
@@ -168,11 +195,11 @@ app.get('/api/tracked/check/:nickname', async (req, res) => {
   }
 });
 
-// Удалить стримера
-app.delete('/api/tracked/:streamerId', async (req, res) => {
+// Удалить стримера (требует авторизации)
+app.delete('/api/tracked/:streamerId', authenticateToken, async (req, res) => {
   const { streamerId } = req.params;
-  const { userId } = req.query;
-  if (!userId) return res.status(401).json({ success: false, error: 'Необходимо авторизоваться' });
+  const userId = req.user.id; // Из JWT токена!
+  
   try {
     await db.removeTrackedStreamer(userId, parseInt(streamerId));
     res.json({ success: true, message: 'Стример удален из отслеживаемых' });
@@ -182,7 +209,7 @@ app.delete('/api/tracked/:streamerId', async (req, res) => {
   }
 });
 
-// Вишлист стримера
+// Вишлист стримера (не требует авторизации)
 app.get('/api/streamer/:id/wishlist', async (req, res) => {
   const { id } = req.params;
   try {
@@ -196,13 +223,15 @@ app.get('/api/streamer/:id/wishlist', async (req, res) => {
   }
 });
 
-// === Настройки уведомлений ===
+// === Настройки уведомлений (требуют авторизации) ===
 
 // Получить настройки уведомлений для стримера
-app.get('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
-  const { userId, streamerId } = req.params;
+app.get('/api/user/streamer/:streamerId/settings', authenticateToken, async (req, res) => {
+  const { streamerId } = req.params;
+  const userId = req.user.id; // Из JWT токена!
+  
   try {
-    const settings = await db.getStreamerSettings(parseInt(userId), parseInt(streamerId));
+    const settings = await db.getStreamerSettings(userId, parseInt(streamerId));
     res.json({ success: true, settings });
   } catch (error) {
     console.error('Ошибка получения настроек:', error);
@@ -211,11 +240,13 @@ app.get('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
 });
 
 // Обновить настройки уведомлений для стримера
-app.put('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
-  const { userId, streamerId } = req.params;
+app.put('/api/user/streamer/:streamerId/settings', authenticateToken, async (req, res) => {
+  const { streamerId } = req.params;
+  const userId = req.user.id; // Из JWT токена!
   const { notifications_enabled, notify_in_pm } = req.body;
+  
   try {
-    await db.updateStreamerSettings(parseInt(userId), parseInt(streamerId), {
+    await db.updateStreamerSettings(userId, parseInt(streamerId), {
       notifications_enabled: notifications_enabled ? 1 : 0,
       notify_in_pm: notify_in_pm ? 1 : 0
     });
@@ -227,10 +258,11 @@ app.put('/api/user/:userId/streamer/:streamerId/settings', async (req, res) => {
 });
 
 // Получить группы пользователя
-app.get('/api/user/:userId/groups', async (req, res) => {
-  const { userId } = req.params;
+app.get('/api/user/groups', authenticateToken, async (req, res) => {
+  const userId = req.user.id; // Из JWT токена!
+  
   try {
-    const groups = await db.getUserGroups(parseInt(userId));
+    const groups = await db.getUserGroups(userId);
     res.json({ success: true, groups });
   } catch (error) {
     console.error('Ошибка получения групп:', error);
