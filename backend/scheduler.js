@@ -143,7 +143,13 @@ class Scheduler {
       
       for (const streamer of uniqueStreamers) {
         await this.checkStreamer(streamer);
-        await this.sleep(3000); // Увеличил с 2 до 3 секунд
+        
+        // КРИТИЧНО: Длинная задержка между стримерами (10-15 секунд)
+        if (uniqueStreamers.indexOf(streamer) < uniqueStreamers.length - 1) {
+          const delay = 10000 + Math.random() * 5000; // 10-15 секунд (было 5-8)
+          console.log(`  ⏳ Пауза ${Math.round(delay/1000)}с перед следующим стримером...\n`);
+          await this.sleep(delay);
+        }
       }
       console.log('=== Проверка завершена ===\n');
     } catch (error) {
@@ -192,6 +198,30 @@ class Scheduler {
       // Проверяем что есть в базе
       const existingItems = await db.getWishlistItems(streamer.id);
       console.log(`  В базе сохранено товаров: ${existingItems.length}`);
+
+      // ЗАЩИТА 1: API вернул 0 товаров, но в базе есть
+      if (currentItems.length === 0 && existingItems.length > 0) {
+        console.log(`  ⚠ API вернул 0 товаров, но в базе ${existingItems.length}`);
+        console.log(`  Это явно rate limit или ошибка API - НЕ сохраняем!`);
+        return;
+      }
+
+      // ЗАЩИТА 2: API вернул подозрительно мало товаров
+      if (existingItems.length > 10 && currentItems.length < 5 && currentItems.length > 0) {
+        console.log(`  ⚠ API вернул всего ${currentItems.length} товаров, но в базе ${existingItems.length}`);
+        console.log(`  Подозрение на rate limit - НЕ сохраняем!`);
+        return;
+      }
+
+      // ЗАЩИТА 3: Резкое уменьшение количества (>30%)
+      if (existingItems.length > 10 && currentItems.length > 0) {
+        const decrease = ((existingItems.length - currentItems.length) / existingItems.length) * 100;
+        if (decrease > 30) {
+          console.log(`  ⚠ Товаров уменьшилось на ${Math.round(decrease)}% (${existingItems.length} → ${currentItems.length})`);
+          console.log(`  Подозрение на неполную загрузку - НЕ сохраняем!`);
+          return;
+        }
+      }
 
       const newItems = await db.getNewWishlistItems(streamer.id, currentItems);
       console.log(`  Определено новых товаров: ${newItems.length}`);

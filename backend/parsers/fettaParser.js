@@ -140,13 +140,13 @@ class FettaParser {
   async getWishlistFromAPI(uid) {
     try {
       let allProducts = [];
-      const seenIds = new Set(); // Для фильтрации дублей
+      const seenIds = new Set();
       let page = 0;
       let hasMore = true;
       let emptyPagesCount = 0;
       const maxEmptyPages = 2;
       let consecutiveErrors = 0;
-      const maxErrors = 3; // Максимум 3 ошибки подряд
+      const maxErrors = 2; // Уменьшил с 3 до 2 - быстрее останавливаемся при rate limit
 
       console.log(`Загрузка товаров для UID ${uid}...`);
 
@@ -156,12 +156,12 @@ class FettaParser {
             `${this.apiUrl}/product/products/public/get`,
             { 
               params: { uid, p: page },
-              timeout: 10000 // 10 секунд таймаут
+              timeout: 20000 // Увеличил до 20 секунд
             }
           );
 
           const data = response.data;
-          consecutiveErrors = 0; // Сброс счётчика ошибок
+          consecutiveErrors = 0; // Сброс счётчика ошибок при успехе
           
           if (data.products && data.products.length > 0) {
             let newProducts = 0;
@@ -188,8 +188,30 @@ class FettaParser {
             console.log(`  Страница p=${page}: пустая`);
             emptyPagesCount++;
           }
+          
+          page++;
+          
+          // КРИТИЧНО: Задержка между страницами
+          if (page <= 10) {
+            const delay = 4000 + Math.random() * 3000; // 4-7 секунд (было 2-4)
+            console.log(`    [пауза ${Math.round(delay/1000)}с перед следующей страницей]`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          
         } catch (error) {
           consecutiveErrors++;
+          
+          // Специальная обработка 429
+          if (error.response && error.response.status === 429) {
+            const retryDelay = 15000 + (consecutiveErrors * 10000); // 15, 25, 35 секунд
+            console.log(`  ⚠ Rate limit 429 на странице p=${page}, длинная пауза ${retryDelay/1000}с`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            
+            // При 429 НЕ увеличиваем счетчик критичных ошибок
+            consecutiveErrors = Math.max(0, consecutiveErrors - 1);
+            continue; // Повторяем ту же страницу
+          }
+          
           console.error(`  ⚠ Ошибка загрузки страницы p=${page}:`, error.message);
           
           if (consecutiveErrors >= maxErrors) {
@@ -198,10 +220,8 @@ class FettaParser {
           }
           
           // Пауза перед retry
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
-
-        page++;
         
         if (page > 10) {
           console.log(`  ⚠ Достигнут лимит страниц (10), останавливаемся`);
@@ -210,6 +230,12 @@ class FettaParser {
       }
 
       console.log(`  Итого уникальных товаров: ${allProducts.length}`);
+      
+      // НОВАЯ ЗАЩИТА: Если товаров меньше 5 - подозрение на rate limit
+      if (allProducts.length > 0 && allProducts.length < 5) {
+        console.log(`  ⚠ ВНИМАНИЕ: Загружено мало товаров (${allProducts.length}), возможно rate limit`);
+      }
+      
       return allProducts;
     } catch (error) {
       console.error('Критическая ошибка при получении вишлиста из API:', error.message);
