@@ -46,7 +46,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(34, 211, 238, 0.1);
-  animation: fadeIn 0.2s ease;
+  animation: guideFadeIn 0.2s ease;
   padding: 20px;
   scroll-behavior: smooth;
 }
@@ -111,7 +111,7 @@
   font-weight: 600;
 }
 
-@keyframes fadeIn {
+@keyframes guideFadeIn {
   from {
     opacity: 0;
     transform: translateX(-50%) translateY(-8px);
@@ -149,7 +149,7 @@
     transform: translateX(-50%);
   }
 
-  @keyframes fadeIn {
+  @keyframes guideFadeIn {
     from {
       opacity: 0;
       transform: translateX(-50%) translateY(-6px);
@@ -195,7 +195,7 @@
     top: calc(100% + 160px);
   }
 
-  @keyframes fadeIn {
+  @keyframes guideFadeIn {
     from {
       opacity: 0;
       transform: translateX(-50%) translateY(-6px);
