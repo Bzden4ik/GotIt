@@ -50,6 +50,8 @@ app.use(helmet({
 // CORS — ограничиваем допустимые origins
 const allowedOrigins = [
   'https://bzden4ik.github.io',          // GitHub Pages (production)
+  'https://go-tit.ru',                   // Собственный домен
+  'https://www.go-tit.ru',              // www версия
   process.env.FRONTEND_URL,               // Из переменных окружения (если задан)
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ].filter(Boolean);
