@@ -82,7 +82,7 @@ function GuideTooltip() {
             </div>
 
             <div className="guide-step">
-              <img src={`${process.env.PUBLIC_URL}/images/3.jpg`} alt="Шаг 3" className="guide-image" />
+              <img src={`${process.env.PUBLIC_URL}/images/4.jpg`} alt="Шаг 3" className="guide-image" />
               <p className="guide-description">
                 <strong>3.</strong> Вставьте ник в поле поиска и нажмите «Найти». <br /> Дождитесь появления карточки (до 2 минут). <br /> Нажмите «Отслеживать», чтобы подписаться на обновление товаров.
               </p>
