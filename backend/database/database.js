@@ -164,11 +164,11 @@ class DatabaseService {
       
       console.log(`Обновление данных стримера ${nickname}`);
       await this.db.execute({
-        sql: `UPDATE streamers SET 
-              name = ?, username = ?, avatar = ?, description = ?, 
-              fetta_url = ?, updated_at = CURRENT_TIMESTAMP 
-              WHERE nickname = ?`,
-        args: [name, username, avatar, description, fettaUrl, nickname]
+        sql: `UPDATE streamers SET
+              name = ?, username = ?, avatar = ?, description = ?,
+              nickname = ?, fetta_url = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE LOWER(nickname) = LOWER(?)`,
+        args: [name, username, avatar, description, nickname, fettaUrl, nickname]
       });
     } else {
       console.log(`Создание нового стримера ${nickname}`);
@@ -183,8 +183,9 @@ class DatabaseService {
   }
 
   async getStreamerByNickname(nickname) {
+    // Ищем без учёта регистра, чтобы Simfonira и simfonira находили одну запись
     const rs = await this.db.execute({
-      sql: 'SELECT * FROM streamers WHERE nickname = ?',
+      sql: 'SELECT * FROM streamers WHERE LOWER(nickname) = LOWER(?)',
       args: [nickname]
     });
     return rs.rows[0] || null;

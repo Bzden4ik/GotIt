@@ -99,7 +99,17 @@ class FettaParser {
   }
 
   /**
+   * Извлечь каноничный никнейм из URL (как он записан на fetta.app)
+   * https://fetta.app/u/simfonira → simfonira
+   */
+  extractCanonicalNickname(url) {
+    const match = url.match(/\/u\/([^/?#]+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
    * Получить страницу стримера и UID
+   * Возвращает { html, canonicalNickname }
    */
   async fetchStreamerPage(nickname) {
     const url = `${this.baseUrl}/u/${nickname}`;
@@ -109,9 +119,17 @@ class FettaParser {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8'
-        }
+        },
+        maxRedirects: 5
       });
-      return response.data;
+
+      // Извлекаем каноничный никнейм из финального URL ответа
+      const finalUrl = response.request?.res?.responseUrl || response.config?.url || url;
+      const canonicalNickname = this.extractCanonicalNickname(finalUrl) || nickname;
+
+      console.log(`Каноничный никнейм: "${canonicalNickname}" (пользователь ввёл: "${nickname}")`);
+
+      return { html: response.data, canonicalNickname };
     } catch (error) {
       if (error.response && error.response.status === 404) {
         throw new Error('Стример не найден');
@@ -348,11 +366,13 @@ class FettaParser {
   async getStreamerInfo(nickname) {
     try {
       console.log(`Получение данных для стримера: ${nickname}`);
-      
-      // Получаем HTML страницы (один запрос вместо двух)
-      const html = await this.fetchStreamerPage(nickname);
-      console.log(`Страница получена, размер: ${html.length} символов`);
-      
+
+      // Получаем HTML страницы и каноничный никнейм из URL fetta.app
+      const { html, canonicalNickname } = await this.fetchStreamerPage(nickname);
+      // Используем каноничный никнейм (как в URL fetta.app, например Fitchu_chan, simfonira)
+      const normalizedNickname = canonicalNickname;
+      console.log(`Страница получена, размер: ${html.length} символов, каноничный ник: ${normalizedNickname}`);
+
       // Извлекаем UID из HTML
       let uid = this.extractUidFromHtml(html);
       
@@ -386,8 +406,8 @@ class FettaParser {
         throw new Error('Не удалось найти UID пользователя. Структура страницы могла измениться.');
       }
       
-      // Парсим профиль из HTML
-      const profile = this.parseStreamerProfile(html, nickname, uid);
+      // Парсим профиль из HTML (используем каноничный никнейм!)
+      const profile = this.parseStreamerProfile(html, normalizedNickname, uid);
       
       // Получаем вишлист из API (все страницы)
       const apiProducts = await this.getWishlistFromAPI(uid);
