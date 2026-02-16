@@ -70,28 +70,21 @@ function GuideTooltip() {
             <div className="guide-step">
               <img src={`${process.env.PUBLIC_URL}/images/1.jpg`} alt="Шаг 1" className="guide-image" />
               <p className="guide-description">
-                <strong>1.</strong> Вам нужна ссылка на Fetta.app вашего стримера, это главное ведь имя вашего стримера на фетте может отличаться нежели на твиче или там где он стример.
+                <strong>1.</strong> Вам нужна прямая ссылка на Fetta.app стримера. <br /> <strong>Это важно, так как его никнейм там может отличаться от имени на Twitch или других площадках!</strong>
               </p>
             </div>
 
             <div className="guide-step">
               <img src={`${process.env.PUBLIC_URL}/images/2.jpg`} alt="Шаг 2" className="guide-image" />
               <p className="guide-description">
-                <strong>2.</strong> Дальше копируем (Ctrl + C или ПКМ → Копировать) в конце ссылки ник вашего стримера без / только имя!
+                <strong>2.</strong> Скопируйте из URL только сам никнейм (текст после слеша).
               </p>
             </div>
 
             <div className="guide-step">
               <img src={`${process.env.PUBLIC_URL}/images/3.jpg`} alt="Шаг 3" className="guide-image" />
               <p className="guide-description">
-                <strong>3.</strong> Тут вы вставляете (Ctrl + V или ПКМ → Вставить) ник вашего стримера в поле: "Введите ник стримера..."
-              </p>
-            </div>
-
-            <div className="guide-step">
-              <img src={`${process.env.PUBLIC_URL}/images/4.jpg`} alt="Шаг 4" className="guide-image" />
-              <p className="guide-description">
-                <strong>4.</strong> Как только вставили ник нажимаем на кнопку Найти и придется подождать от 1 минуты до 2 минут, как только стример найдется снизу под поиском он появиться и нажимайте на кнопку отслеживать всё готово! Вы подписались на уведомления об обновлении товаров вишлиста этого стримера.
+                <strong>3.</strong> Вставьте ник в поле поиска и нажмите «Найти». <br /> Дождитесь появления карточки (до 2 минут). <br /> Нажмите «Отслеживать», чтобы подписаться на обновление товаров.
               </p>
             </div>
           </div>
