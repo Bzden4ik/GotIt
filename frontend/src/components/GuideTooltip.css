@@ -33,8 +33,9 @@
 
 .guide-popup {
   position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
   width: max-content;
   max-width: calc(100vw - 40px);
@@ -50,19 +51,43 @@
   scroll-behavior: smooth;
 }
 
+/* Градиенты для индикации прокрутки */
+.guide-popup::before,
+.guide-popup::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.guide-popup::before {
+  left: 0;
+  background: linear-gradient(to right, var(--card), transparent);
+}
+
+.guide-popup::after {
+  right: 0;
+  background: linear-gradient(to left, var(--card), transparent);
+}
+
 .guide-content {
   display: flex;
   flex-direction: row;
   gap: 20px;
   height: 100%;
+  position: relative;
+  z-index: 2;
 }
 
 .guide-step {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 12px;
   width: 320px;
-  flex-shrink: 0;
 }
 
 .guide-image {
@@ -89,11 +114,11 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateX(-50%) translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -120,6 +145,19 @@
   .guide-popup {
     max-width: calc(100vw - 40px);
     max-height: 450px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   }
 
   .guide-step {
@@ -135,6 +173,7 @@
 @media (max-width: 600px) {
   .guide-tooltip-wrapper {
     margin-bottom: 16px;
+    width: 100%;
   }
 
   .guide-trigger {
@@ -148,10 +187,23 @@
 
   .guide-popup {
     width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
     max-height: 400px;
     left: 50%;
     transform: translateX(-50%);
     padding: 16px;
+    top: calc(100% + 8px);
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   }
 
   .guide-step {
@@ -185,6 +237,9 @@
   .guide-popup {
     padding: 12px;
     max-height: 360px;
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    top: calc(100% + 6px);
   }
 
   .guide-step {

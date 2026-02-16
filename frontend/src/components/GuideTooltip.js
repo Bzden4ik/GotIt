@@ -12,6 +12,21 @@ function GuideTooltip() {
       const scrollWidth = popupRef.current.scrollWidth;
       const clientWidth = popupRef.current.clientWidth;
       popupRef.current.scrollLeft = (scrollWidth - clientWidth) / 2;
+
+      // Добавить обработчик колесика для горизонтальной прокрутки
+      const handleWheel = (e) => {
+        if (e.deltaY !== 0) {
+          e.preventDefault();
+          popupRef.current.scrollLeft += e.deltaY;
+        }
+      };
+
+      const popup = popupRef.current;
+      popup.addEventListener('wheel', handleWheel, { passive: false });
+
+      return () => {
+        popup.removeEventListener('wheel', handleWheel);
+      };
     }
   }, [isVisible]);
 
