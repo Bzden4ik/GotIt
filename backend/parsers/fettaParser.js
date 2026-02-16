@@ -125,7 +125,7 @@ class FettaParser {
 
       // Извлекаем каноничный никнейм из финального URL ответа
       const finalUrl = response.request?.res?.responseUrl || response.config?.url || url;
-      const canonicalNickname = this.extractCanonicalNickname(finalUrl) || nickname;
+      const canonicalNickname = (this.extractCanonicalNickname(finalUrl) || nickname).toLowerCase();
 
       console.log(`Каноничный никнейм: "${canonicalNickname}" (пользователь ввёл: "${nickname}")`);
 
