@@ -30,11 +30,19 @@
   margin-bottom: 52px;
 }
 
+/* ── Search with Guide Wrapper ── */
+.search-with-guide {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 56px;
+}
+
 /* ── Search Bar ── */
 .search-form {
   display: flex;
   width: 100%;
-  margin-bottom: 56px;
   border-radius: var(--r-lg);
   border: 1px solid var(--line);
   background: var(--surface);
@@ -164,7 +172,7 @@
 /* ── Tablet ── */
 @media (max-width: 768px) {
   .page-subtitle { font-size: 16px; margin-bottom: 36px; text-align: left;}
-  .search-form { margin-bottom: 40px; }
+  .search-with-guide { margin-bottom: 40px; }
   .search-input { padding: 18px 20px; font-size: 16px; }
   .search-btn { padding: 18px 28px; font-size: 15px; }
   .streamer-card { padding: 24px; gap: 18px; }

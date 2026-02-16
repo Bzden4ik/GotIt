@@ -1,0 +1,177 @@
+.guide-tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.guide-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  transition: all 0.2s ease;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.guide-trigger:hover {
+  color: var(--cyan);
+  background: rgba(34, 211, 238, 0.05);
+}
+
+.guide-icon {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.guide-text {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.guide-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
+  width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(34, 211, 238, 0.1);
+  animation: fadeIn 0.2s ease;
+  padding: 20px;
+}
+
+.guide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.guide-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  object-fit: contain;
+}
+
+.guide-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--dim);
+  margin: 0;
+}
+
+.guide-description strong {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling */
+.guide-popup::-webkit-scrollbar {
+  width: 8px;
+}
+
+.guide-popup::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.guide-popup::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+.guide-popup::-webkit-scrollbar-thumb:hover {
+  background: var(--line-hover);
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+  .guide-popup {
+    width: 400px;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .guide-tooltip-wrapper {
+    margin-bottom: 16px;
+  }
+
+  .guide-trigger {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+
+  .guide-icon {
+    font-size: 16px;
+  }
+
+  .guide-popup {
+    width: calc(100vw - 32px);
+    left: 50%;
+    transform: translateX(-50%);
+    max-height: 70vh;
+    padding: 16px;
+  }
+
+  .guide-content {
+    gap: 20px;
+  }
+
+  .guide-description {
+    font-size: 13px;
+  }
+}
+
+/* Small phones */
+@media (max-width: 380px) {
+  .guide-trigger {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+
+  .guide-text {
+    font-size: 12px;
+  }
+
+  .guide-popup {
+    padding: 12px;
+  }
+
+  .guide-content {
+    gap: 16px;
+  }
+
+  .guide-step {
+    gap: 8px;
+  }
+
+  .guide-description {
+    font-size: 12px;
+  }
+}

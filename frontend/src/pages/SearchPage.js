@@ -5,6 +5,7 @@ import apiService from '../services/api';
 import Toast from '../components/Toast';
 import TextDecode from '../components/TextDecode';
 import SearchLoader from '../components/SearchLoader';
+import GuideTooltip from '../components/GuideTooltip';
 import './SearchPage.css';
 
 function SearchPage({ user }) {
@@ -95,7 +96,9 @@ function SearchPage({ user }) {
         <div className={`search-below ${titleDone ? 'search-below--visible' : ''}`}>
           <p className="page-subtitle">Введите никнейм, чтобы увидеть вишлист</p>
 
-          <form onSubmit={handleSearch} className="search-form">
+          <div className="search-with-guide">
+            <GuideTooltip />
+            <form onSubmit={handleSearch} className="search-form">
             <input
               type="text"
               placeholder="Введите ник стримера..."
@@ -107,6 +110,7 @@ function SearchPage({ user }) {
               {loading ? 'Поиск...' : 'Найти'}
             </button>
           </form>
+          </div>
         </div>
 
         {error && (
