@@ -239,7 +239,7 @@ app.get('/api/streamer/search', async (req, res) => {
   if (!nickname) return res.status(400).json({ error: 'Необходимо указать nickname' });
   try {
     console.log(`Поиск стримера: ${nickname}`);
-    const result = await fettaParser.getStreamerInfo(nickname);
+    const result = await fettaParser.searchStreamer(nickname);
     if (!result.success) return res.status(404).json({ success: false, error: result.error });
     res.json({ success: true, streamer: result.profile });
   } catch (error) {
