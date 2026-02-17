@@ -361,58 +361,73 @@ class FettaParser {
   }
 
   /**
-   * Получить полную информацию о стримере
+   * Получить страницу, извлечь UID и профиль (общая логика)
+   */
+  async fetchProfileAndUid(nickname) {
+    console.log(`Получение данных для стримера: ${nickname}`);
+
+    const { html, canonicalNickname } = await this.fetchStreamerPage(nickname);
+    const normalizedNickname = canonicalNickname;
+    console.log(`Страница получена, размер: ${html.length} символов, каноничный ник: ${normalizedNickname}`);
+
+    let uid = this.extractUidFromHtml(html);
+
+    if (uid) {
+      const valid = await this.verifyUid(uid);
+      if (!valid) {
+        console.log(`UID ${uid} не прошёл проверку, ищем дальше...`);
+        const allUuids = html.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g);
+        if (allUuids) {
+          const unique = [...new Set(allUuids)];
+          for (const candidate of unique) {
+            if (candidate === uid) continue;
+            const ok = await this.verifyUid(candidate);
+            if (ok) {
+              console.log(`Верный UID найден перебором: ${candidate}`);
+              uid = candidate;
+              break;
+            }
+          }
+        }
+      } else {
+        console.log(`UID подтверждён: ${uid}`);
+      }
+    }
+
+    if (!uid) {
+      console.error('Не удалось найти UID. Первые 500 символов HTML:');
+      console.error(html.substring(0, 500));
+      throw new Error('Не удалось найти UID пользователя. Структура страницы могла измениться.');
+    }
+
+    const profile = this.parseStreamerProfile(html, normalizedNickname, uid);
+    return { profile, uid };
+  }
+
+  /**
+   * Быстрый поиск — только профиль, БЕЗ загрузки товаров
+   */
+  async searchStreamer(nickname) {
+    try {
+      const { profile } = await this.fetchProfileAndUid(nickname);
+      return { success: true, profile };
+    } catch (error) {
+      console.error('Ошибка при поиске стримера:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Получить полную информацию о стримере (профиль + товары + категории)
    */
   async getStreamerInfo(nickname) {
     try {
-      console.log(`Получение данных для стримера: ${nickname}`);
+      const { profile, uid } = await this.fetchProfileAndUid(nickname);
 
-      // Получаем HTML страницы и каноничный никнейм из URL fetta.app
-      const { html, canonicalNickname } = await this.fetchStreamerPage(nickname);
-      // Используем каноничный никнейм (как в URL fetta.app, например Fitchu_chan, simfonira)
-      const normalizedNickname = canonicalNickname;
-      console.log(`Страница получена, размер: ${html.length} символов, каноничный ник: ${normalizedNickname}`);
-
-      // Извлекаем UID из HTML
-      let uid = this.extractUidFromHtml(html);
-      
-      if (uid) {
-        // Проверяем UID через API
-        const valid = await this.verifyUid(uid);
-        if (!valid) {
-          console.log(`UID ${uid} не прошёл проверку, ищем дальше...`);
-          // Пробуем найти другие UUID
-          const allUuids = html.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g);
-          if (allUuids) {
-            const unique = [...new Set(allUuids)];
-            for (const candidate of unique) {
-              if (candidate === uid) continue;
-              const ok = await this.verifyUid(candidate);
-              if (ok) {
-                console.log(`Верный UID найден перебором: ${candidate}`);
-                uid = candidate;
-                break;
-              }
-            }
-          }
-        } else {
-          console.log(`UID подтверждён: ${uid}`);
-        }
-      }
-      
-      if (!uid) {
-        console.error('Не удалось найти UID. Первые 500 символов HTML:');
-        console.error(html.substring(0, 500));
-        throw new Error('Не удалось найти UID пользователя. Структура страницы могла измениться.');
-      }
-      
-      // Парсим профиль из HTML (используем каноничный никнейм!)
-      const profile = this.parseStreamerProfile(html, normalizedNickname, uid);
-      
       // Получаем вишлист из API (все страницы)
       const apiProducts = await this.getWishlistFromAPI(uid);
       console.log(`Получено товаров из API: ${apiProducts.length}`);
-      
+
       // Получаем категории
       const categories = await this.getCategoriesFromAPI(uid);
       console.log(`Получено категорий: ${categories.length}`);

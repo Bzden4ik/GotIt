@@ -37,7 +37,9 @@
   gap: 16px;
   transition: all 0.3s var(--ease);
   position: relative;
+  z-index: -1;
 }
+
 .streamer-card:hover {
   border-color: var(--line-hover);
   transform: translateY(-3px);

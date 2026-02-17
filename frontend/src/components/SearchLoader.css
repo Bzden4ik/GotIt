@@ -5,6 +5,7 @@
   gap: 32px;
   padding: 60px 20px;
   animation: fadeUp 0.5s var(--ease);
+  z-index: -1;
 }
 
 /* ── Spinner ── */
