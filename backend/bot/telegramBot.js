@@ -2,6 +2,9 @@ const axios = require('axios');
 const db = require('../database/database');
 const AIAssistant = require('./aiAssistant');
 
+// Используем глобальный botLog если есть, иначе обычный console
+const log = global.botLog || { info: console.log, error: console.error, warn: console.warn };
+
 class TelegramBot {
   constructor(token) {
     this.token = token;
@@ -27,9 +30,9 @@ class TelegramBot {
       });
       return response.data;
     } catch (error) {
-      console.error(`Ошибка отправки сообщения в Telegram (${chatId}):`, error.message);
+      log.error(`Ошибка отправки сообщения (chatId: ${chatId}): ${error.message}`);
       if (error.response) {
-        console.error('Детали ошибки:', error.response.data);
+        log.error(`Детали: ${JSON.stringify(error.response.data)}`);
       }
       throw error;
     }
@@ -46,7 +49,7 @@ class TelegramBot {
         show_alert: showAlert
       });
     } catch (error) {
-      console.error('Ошибка ответа на callback:', error.message);
+      log.error(`Ошибка ответа на callback: ${error.message}`);
     }
   }
 
@@ -64,7 +67,7 @@ class TelegramBot {
         ...options
       });
     } catch (error) {
-      console.error('Ошибка редактирования сообщения:', error.message);
+      log.error(`Ошибка редактирования сообщения: ${error.message}`);
     }
   }
 
@@ -389,7 +392,7 @@ class TelegramBot {
     const from = myChatMember.from;
 
     if (newStatus === 'member' || newStatus === 'administrator') {
-      console.log(`Бот добавлен в группу: ${chat.title} (${chat.id}) пользователем ${from.first_name}`);
+      log.info(`Бот добавлен в группу: ${chat.title} (${chat.id}) пользователем ${from.first_name}`);
 
       await db.createUser(from.id, from.username || '', from.first_name || '');
       const user = await db.getUserByTelegramId(from.id);
@@ -423,20 +426,24 @@ class TelegramBot {
         const text = update.message.text;
         
         if (text.startsWith('/start')) {
+          log.info(`Команда /start от ${update.message.from.username || update.message.from.id}`);
           await this.handleStartCommand(update.message);
           return;
         }
         if (text.startsWith('/settings')) {
+          log.info(`Команда /settings от ${update.message.from.username || update.message.from.id}`);
           await this.handleSettingsCommand(update.message);
           return;
         }
         if (text.startsWith('/groups')) {
+          log.info(`Команда /groups от ${update.message.from.username || update.message.from.id}`);
           await this.handleGroupsCommand(update.message);
           return;
         }
-        
+
         // Обычные сообщения - отправляем в AI
         if (!text.startsWith('/')) {
+          log.info(`AI сообщение от ${update.message.from.username || update.message.from.id}: "${text.substring(0, 50)}..."`);
           await this.handleAIMessage(update.message);
           return;
         }
@@ -454,7 +461,7 @@ class TelegramBot {
         return;
       }
     } catch (error) {
-      console.error('Ошибка обработки обновления:', error);
+      log.error(`Ошибка обработки обновления: ${error.message}`);
     }
   }
 
@@ -534,13 +541,13 @@ class TelegramBot {
         disable_web_page_preview: true
       });
     } catch (error) {
-      console.error('Ошибка AI обработки:', error);
+      log.error(`Ошибка AI обработки: ${error.message}`);
       
       // Не показываем технические детали пользователю
       try {
         await this.sendMessage(chatId, 'Извини, Сэмпай, что-то пошло не так 😔 Попробуй позже или используй команды /settings и /groups');
       } catch (sendError) {
-        console.error('Не удалось отправить сообщение об ошибке:', sendError);
+        log.error(`Не удалось отправить сообщение об ошибке: ${sendError.message}`);
       }
     }
   }
@@ -553,10 +560,10 @@ class TelegramBot {
       const response = await axios.post(`${this.apiUrl}/setWebhook`, {
         url: url
       });
-      console.log('Webhook установлен:', response.data);
+      log.info(`Webhook установлен: ${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error) {
-      console.error('Ошибка установки webhook:', error.message);
+      log.error(`Ошибка установки webhook: ${error.message}`);
       throw error;
     }
   }
@@ -569,7 +576,7 @@ class TelegramBot {
       const response = await axios.get(`${this.apiUrl}/getMe`);
       return response.data;
     } catch (error) {
-      console.error('Ошибка проверки бота:', error.message);
+      log.error(`Ошибка проверки бота: ${error.message}`);
       throw error;
     }
   }
