@@ -231,10 +231,14 @@ class Scheduler {
       const existingItems = await db.getWishlistItems(streamer.id);
       console.log(`  В базе сохранено товаров: ${existingItems.length}`);
 
-      // ЗАЩИТА 1: API вернул 0 товаров, но в базе есть
-      if (currentItems.length === 0 && existingItems.length > 0) {
-        console.log(`  ⚠ API вернул 0 товаров, но в базе ${existingItems.length}`);
-        console.log(`  Это явно rate limit или ошибка API - НЕ сохраняем!`);
+      // ЗАЩИТА 1: API вернул 0 товаров, но в базе есть много — подозрение на rate limit
+      // Примечание: реальный пустой вишлист (0 товаров) — это не rate limit.
+      // 429 rate limit выбрасывает исключение и обрабатывается retry-логикой выше.
+      // Если стример убрал все товары — API вернёт 200 с пустым списком, и это нормально.
+      // Защита срабатывает только при резком падении с большого числа (>10) до нуля.
+      if (currentItems.length === 0 && existingItems.length > 10) {
+        console.log(`  ⚠ API вернул 0 товаров, но в базе ${existingItems.length} — подозрение на неполную загрузку`);
+        console.log(`  НЕ сохраняем!`);
         return;
       }
 
