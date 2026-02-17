@@ -10,6 +10,8 @@ export function useTrackedStreamers(enabled = true) {
     queryFn: () => apiService.getTrackedStreamers(),
     enabled,
     select: (data) => data.streamers || [],
+    refetchInterval: 30 * 1000, // Обновляем каждые 30 секунд (itemsCount)
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -125,6 +127,8 @@ export function useWishlist(streamerId, enabled = true) {
     queryKey: ['wishlist', streamerId],
     queryFn: () => apiService.getWishlist(streamerId),
     enabled: enabled && !!streamerId,
+    refetchInterval: 30 * 1000, // Обновляем каждые 30 секунд
+    refetchIntervalInBackground: false,
     select: (data) => data.items || [],
   });
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import apiService from '../services/api';
+import React from 'react';
+import { useWishlist } from '../services/apiHooks';
 import './WishlistModal.css';
 
 // Определяем название площадки по URL
@@ -26,27 +26,8 @@ function getPlatformName(url) {
 }
 
 function WishlistModal({ streamer, onClose }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const loadWishlist = async () => {
-      try {
-        setLoading(true);
-        const response = await apiService.getWishlist(streamer.id);
-        if (response.success) {
-          setItems(response.items);
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadWishlist();
-  }, [streamer.id]);
+  const { data: items = [], isLoading: loading, error: queryError } = useWishlist(streamer.id);
+  const error = queryError?.message || null;
 
   const fettaUrl = streamer.fetta_url || `https://fetta.app/u/${streamer.nickname}`;
 
