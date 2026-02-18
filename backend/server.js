@@ -519,6 +519,12 @@ app.post('/api/admin/scheduler/streamer/:id/priority', adminAuth, async (req, re
   }
 });
 
+// Статус очереди планировщика
+app.get('/api/admin/scheduler/queue', adminAuth, (req, res) => {
+  if (!schedulerRef) return res.json({ success: true, queue: [], workerBusy: false, currentStreamer: null, history: {}, planLog: [] });
+  res.json({ success: true, ...schedulerRef.getQueueStatus() });
+});
+
 // === Telegram Webhook ===
 app.post('/webhook/telegram', async (req, res) => {
   try {
@@ -615,6 +621,37 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 .sched-refresh{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:7px 14px;border-radius:7px;font-size:13px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
 .sched-refresh:hover{color:#7ee8fa;border-color:#7ee8fa}
 .interval-info{font-size:12px;color:#555;margin-top:4px}
+.queue-section{margin-top:28px}
+.queue-title{font-size:13px;color:#7ee8fa;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.queue-title .q-count{background:#7ee8fa22;color:#7ee8fa;border:1px solid #7ee8fa44;padding:2px 9px;border-radius:10px;font-size:12px}
+.timeline{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:8px;min-height:64px}
+.timeline::-webkit-scrollbar{height:4px}
+.timeline::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+.tl-block{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 12px;border-radius:8px;min-width:90px;max-width:160px;position:relative;flex-shrink:0;transition:transform .2s,box-shadow .2s;cursor:default}
+.tl-block:hover{transform:translateY(-2px);box-shadow:0 4px 16px #0006}
+.tl-active{background:#7ee8fa18;border:1px solid #7ee8fa55;animation:activePulse 2s infinite}
+@keyframes activePulse{0%,100%{border-color:#7ee8fa55;box-shadow:0 0 0 0 #7ee8fa22}50%{border-color:#7ee8fa;box-shadow:0 0 0 4px #7ee8fa11}}
+.tl-p3{background:#f59e0b14;border:1px solid #f59e0b44}
+.tl-p2{background:#60a5fa14;border:1px solid #60a5fa44}
+.tl-p1{background:#ffffff08;border:1px solid #ffffff18}
+.tl-p3.tl-active{background:#f59e0b1a;border-color:#f59e0b;animation:activePulseVip 2s infinite}
+@keyframes activePulseVip{0%,100%{border-color:#f59e0b66;box-shadow:0 0 0 0 #f59e0b22}50%{border-color:#f59e0b;box-shadow:0 0 0 4px #f59e0b11}}
+.tl-nick{font-size:13px;font-weight:600;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+.tl-est{font-size:11px;color:#666;margin-top:3px}
+.tl-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-bottom:4px}
+.tl-badge-3{color:#f59e0b;background:#f59e0b18}.tl-badge-2{color:#60a5fa;background:#60a5fa18}.tl-badge-1{color:#888;background:#88888818}
+.tl-arrow{width:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#333;font-size:16px;align-self:center}
+.tl-gap-label{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;color:#4ade80;white-space:nowrap;background:#0a0a0f;padding:0 4px}
+.tl-progress{position:absolute;bottom:0;left:0;height:3px;background:#7ee8fa;border-radius:0 0 7px 7px;transition:width 1s linear}
+.tl-p3 .tl-progress{background:#f59e0b}
+.tl-p2 .tl-progress{background:#60a5fa}
+.tl-empty{color:#333;font-size:13px;padding:20px;text-align:center;width:100%}
+.plan-log{margin-top:16px}
+.plan-log-title{font-size:12px;color:#444;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em}
+.plan-log-list{display:flex;flex-direction:column;gap:4px;max-height:140px;overflow-y:auto}
+.plan-log-item{font-size:12px;padding:5px 10px;border-radius:6px;background:#111118;border-left:3px solid #2a2a3a;color:#666;display:flex;align-items:center;gap:8px;animation:slideIn .3s ease}
+.plan-log-item.gap{border-left-color:#4ade80;color:#aaa}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 </style></head><body>
 <div class="header">
   <h1>GotIt Admin</h1>
@@ -671,6 +708,18 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
     </tr></thead>
     <tbody id="schedBody"><tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Загрузка...</td></tr></tbody>
   </table>
+
+  <div class="queue-section">
+    <div class="queue-title">
+      Очередь проверок
+      <span class="q-count" id="qCount">0</span>
+    </div>
+    <div class="timeline" id="qTimeline"><div class="tl-empty">Очередь пуста</div></div>
+    <div class="plan-log">
+      <div class="plan-log-title">Последние вставки планировщика</div>
+      <div class="plan-log-list" id="planLogList"><div style="color:#333;font-size:12px;padding:4px 10px">Нет данных</div></div>
+    </div>
+  </div>
 </div>
 <script>
 const T='${token}';
@@ -725,9 +774,13 @@ function startAuto(){clearInterval(timer);timer=setInterval(()=>{if(auto){if(tab
 fetchLogs();fetchStatus();startAuto();
 
 async function fetchScheduler(){try{
-  const r=await fetch('/api/admin/scheduler/streamers?token='+T);
-  const d=await r.json();if(!d.success)return;
-  schedData=d;renderScheduler();
+  const [r1,r2]=await Promise.all([
+    fetch('/api/admin/scheduler/streamers?token='+T),
+    fetch('/api/admin/scheduler/queue?token='+T)
+  ]);
+  const [d1,d2]=await Promise.all([r1.json(),r2.json()]);
+  if(d1.success){schedData=d1;renderScheduler();}
+  if(d2.success){renderQueue(d2);}
 }catch(e){}}
 
 function fmtAgo(ts){
@@ -772,6 +825,102 @@ function renderScheduler(){
         '<button class="sched-save" id="sbtn_'+s.id+'" onclick="savePriority('+s.id+',this.previousElementSibling)">Сохранить</button>'+
       '</td>'+
     '</tr>';
+  }).join('');
+}
+
+function fmtMs(ms){if(!ms)return'~?с';const s=Math.round(ms/1000);return'~'+s+'с';}
+
+function renderQueue(data){
+  const tl=document.getElementById('qTimeline');
+  const countEl=document.getElementById('qCount');
+  const {currentStreamer,queue,history}=data;
+  const blocks=[];
+
+  // Текущий (активный)
+  if(currentStreamer){
+    const est=history[currentStreamer.id]?.avg||25000;
+    const progress=Math.min(100,Math.round(currentStreamer.runningMs/est*100));
+    blocks.push({
+      id:currentStreamer.id,
+      nick:currentStreamer.nickname,
+      p:currentStreamer.priority,
+      est,
+      progress,
+      active:true,
+      label:'сейчас'
+    });
+  }
+
+  // Очередь
+  for(const s of queue){
+    blocks.push({
+      id:s.id,
+      nick:s.nickname,
+      p:s.priority,
+      est:s.estimatedMs,
+      progress:0,
+      active:false,
+      label:null
+    });
+  }
+
+  countEl.textContent=queue.length+(currentStreamer?'+1':'');
+
+  if(!blocks.length){
+    tl.innerHTML='<div class="tl-empty">Очередь пуста</div>';
+    renderPlanLog(data.planLog||[]);
+    return;
+  }
+
+  // Строим HTML с анимацией — не перерисовываем если набор не изменился
+  const newKey=blocks.map(b=>b.id+':'+b.p+':'+b.active).join('|');
+  if(tl.dataset.key===newKey){
+    // Только обновляем прогресс-бары активного блока
+    if(currentStreamer){
+      const pb=document.getElementById('pb_'+currentStreamer.id);
+      if(pb){
+        const est=history[currentStreamer.id]?.avg||25000;
+        pb.style.width=Math.min(100,Math.round(currentStreamer.runningMs/est*100))+'%';
+      }
+    }
+    renderPlanLog(data.planLog||[]);
+    return;
+  }
+  tl.dataset.key=newKey;
+
+  const PNAMES={3:'VIP',2:'High',1:'Normal'};
+  let html='';
+  for(let i=0;i<blocks.length;i++){
+    const b=blocks[i];
+    const cls='tl-block tl-p'+b.p+(b.active?' tl-active':'');
+    const histInfo=history[b.id];
+    const estLabel=histInfo?fmtMs(histInfo.avg):(b.active?fmtMs(b.est):'est. ?');
+    html+='<div class="'+cls+'" id="tlb_'+b.id+'">';
+    html+='<div class="tl-badge tl-badge-'+b.p+'">'+PNAMES[b.p]+'</div>';
+    html+='<div class="tl-nick">'+esc(b.nick)+'</div>';
+    html+='<div class="tl-est">'+(b.active?'⚡ идёт...':estLabel)+'</div>';
+    if(b.active){html+='<div class="tl-progress" id="pb_'+b.id+'" style="width:'+b.progress+'%"></div>';}
+    html+='</div>';
+    if(i<blocks.length-1)html+='<div class="tl-arrow">›</div>';
+  }
+  tl.innerHTML=html;
+  renderPlanLog(data.planLog||[]);
+}
+
+const PLAN_LOG_ICONS={gap_insert:'💡'};
+function renderPlanLog(log){
+  const el=document.getElementById('planLogList');
+  if(!log.length){el.innerHTML='<div style="color:#333;font-size:12px;padding:4px 10px">Нет данных</div>';return;}
+  el.innerHTML=log.map(e=>{
+    const ago=Math.round((Date.now()-e.ts)/1000);
+    const icon=PLAN_LOG_ICONS[e.type]||'•';
+    const PNAMES={3:'VIP',2:'High',1:'Normal'};
+    return'<div class="plan-log-item gap">'+
+      '<span>'+icon+'</span>'+
+      '<span><b style="color:#ccc">'+esc(e.nickname)+'</b> ['+PNAMES[e.priority]+']</span>'+
+      '<span style="color:#555">вставлен в паузу '+fmtMs(e.baseDelay)+'</span>'+
+      '<span style="margin-left:auto;color:#444">'+ago+'с назад</span>'+
+    '</div>';
   }).join('');
 }
 

@@ -23,14 +23,18 @@ class Scheduler {
     // Priority-based intervals
     const normalInterval = (parseInt(process.env.CHECK_INTERVAL) || 60) * 1000;
     this.checkIntervals = { 3: 30000, 2: 60000, 1: normalInterval };
-    this.streamerDelays  = { 3: 3000,  2: 5000,  1: null }; // null = 10-15с рандом
+    this.baseDelays     = { 3: 3000,  2: 5000,  1: 15000 }; // базовая пауза после проверки
 
-    // Priority queue: массив { streamer, addedAt }
-    // Воркер берёт по одному — нет параллельных запросов к fetta.app
-    this.queue = [];
-    this.queuedIds = new Set();   // чтобы не добавлять одного стримера дважды
+    // Очередь и состояние
+    this.queue      = [];        // [{ streamer, addedAt }]
+    this.queuedIds  = new Set();
     this.workerBusy = false;
-    this.lastChecked = new Map(); // streamerId -> timestamp последней проверки
+    this.lastChecked = new Map(); // id -> timestamp постановки в очередь
+
+    // Умный планировщик
+    this.checkHistory = new Map(); // id -> [duration1, duration2, ...] последние 5
+    this.currentStreamer = null;   // { streamer, startedAt } — что проверяется сейчас
+    this.planLog = [];             // последние N записей плана для UI
 
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
     globalSchedulerInstance = this;
@@ -39,10 +43,7 @@ class Scheduler {
   // ─── Запуск ───────────────────────────────────────────────────────────────
 
   async start(intervalSeconds = 60) {
-    if (this.isRunning) {
-      console.log('⚠ Планировщик уже запущен');
-      return;
-    }
+    if (this.isRunning) { console.log('⚠ Планировщик уже запущен'); return; }
 
     this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
     if (!this.hasLock) {
@@ -67,18 +68,16 @@ class Scheduler {
     if (this.isRunning) return;
     this.isRunning = true;
 
-    // Heartbeat
     this.heartbeatId = setInterval(() => db.updateSchedulerHeartbeat(this.schedulerId), 20000);
 
-    // Тик каждые 5с: добавляем в очередь стримеров, у которых истёк интервал
+    // Тик каждые 5с — добавляем в очередь стримеров у которых истёк интервал
     this.intervalId = setInterval(() => {
       if (this.isWithinWorkingHours()) this.enqueueDueStreamers();
     }, 5000);
 
-    const normalSec = Math.round((this.checkIntervals[1]) / 1000);
+    const normalSec = Math.round(this.checkIntervals[1] / 1000);
     console.log(`✅ Планировщик запущен | VIP=30с High=60с Normal=${normalSec}с | тик=5с`);
 
-    // Первый запуск через 10с
     setTimeout(() => {
       if (this.isWithinWorkingHours()) this.enqueueDueStreamers();
     }, 10000);
@@ -101,13 +100,8 @@ class Scheduler {
 
   async enqueueDueStreamers() {
     let streamers;
-    try {
-      streamers = await db.getAllTrackedStreamers();
-    } catch (e) {
-      console.error('Ошибка получения стримеров:', e.message);
-      return;
-    }
-
+    try { streamers = await db.getAllTrackedStreamers(); }
+    catch (e) { console.error('Ошибка получения стримеров:', e.message); return; }
     if (!streamers.length) return;
 
     // Дедупликация по nickname
@@ -122,33 +116,32 @@ class Scheduler {
     let added = 0;
 
     for (const streamer of unique) {
-      if (this.queuedIds.has(streamer.id)) continue; // уже в очереди
+      if (this.queuedIds.has(streamer.id)) continue;
+      // Не добавляем того, кто сейчас проверяется
+      if (this.currentStreamer?.streamer.id === streamer.id) continue;
 
       const priority = streamer.priority || 1;
       const interval = this.checkIntervals[priority] || this.checkIntervals[1];
       const last = this.lastChecked.get(streamer.id) || 0;
 
       if (now - last >= interval) {
-        this.lastChecked.set(streamer.id, now); // помечаем сразу при постановке в очередь
+        this.lastChecked.set(streamer.id, now);
         this.enqueue(streamer);
         added++;
       }
     }
 
     if (added > 0) {
-      console.log(`📥 Добавлено в очередь: ${added} стримеров (в очереди всего: ${this.queue.length})`);
+      console.log(`📥 В очередь: +${added} (всего: ${this.queue.length})`);
       this.runWorker();
     }
   }
 
   enqueue(streamer) {
-    // Вставляем по приоритету: VIP в начало, Normal в конец
     const priority = streamer.priority || 1;
     if (priority === 3) {
-      // VIP — в самое начало
       this.queue.unshift(streamer);
     } else if (priority === 2) {
-      // High — перед Normal, но после VIP
       const firstNormal = this.queue.findIndex(s => (s.priority || 1) === 1);
       if (firstNormal === -1) this.queue.push(streamer);
       else this.queue.splice(firstNormal, 0, streamer);
@@ -158,30 +151,138 @@ class Scheduler {
     this.queuedIds.add(streamer.id);
   }
 
+  // ─── Умный планировщик ────────────────────────────────────────────────────
+
+  /** Среднее время проверки стримера (мс). Дефолт 25с */
+  estimateDuration(streamerId) {
+    const hist = this.checkHistory.get(streamerId);
+    if (!hist || !hist.length) return 25000;
+    return Math.round(hist.reduce((a, b) => a + b, 0) / hist.length);
+  }
+
+  /** Записать реальное время проверки */
+  recordDuration(streamerId, durationMs) {
+    const hist = this.checkHistory.get(streamerId) || [];
+    hist.push(durationMs);
+    if (hist.length > 5) hist.shift(); // храним последние 5
+    this.checkHistory.set(streamerId, hist);
+  }
+
+  /**
+   * Найти кандидата для вставки в паузу.
+   * availableMs — сколько мс есть в паузе.
+   * Возвращает { streamer, index } или null.
+   */
+  findGapCandidate(availableMs) {
+    const BUFFER = 3000; // 3с буфер безопасности
+    const needed = availableMs - BUFFER;
+    if (needed < 5000) return null; // меньше 5с — не стоит пытаться
+
+    // Ищем в очереди VIP или High который влезет по времени
+    for (let i = 0; i < this.queue.length; i++) {
+      const s = this.queue[i];
+      const priority = s.priority || 1;
+      if (priority === 1) continue; // Normal не вставляем
+      const est = this.estimateDuration(s.id);
+      if (est <= needed) {
+        return { streamer: s, index: i };
+      }
+    }
+
+    // Если в очереди нет подходящих — ищем среди "почти готовых" VIP/High
+    // (lastChecked + interval - now <= availableMs)
+    const now = Date.now();
+    // Этот случай сложнее — пропустим его, очередь достаточно хороша
+    return null;
+  }
+
+  /** Добавить запись в planLog (для UI) */
+  addPlanLog(entry) {
+    this.planLog.unshift({ ...entry, ts: Date.now() });
+    if (this.planLog.length > 50) this.planLog.pop();
+  }
+
   // ─── Воркер ───────────────────────────────────────────────────────────────
 
   async runWorker() {
-    if (this.workerBusy) return; // воркер уже работает
+    if (this.workerBusy) return;
     this.workerBusy = true;
 
     while (this.queue.length > 0) {
       const streamer = this.queue.shift();
       this.queuedIds.delete(streamer.id);
 
-      await this.checkStreamer(streamer);
-      // lastChecked уже выставлен при enqueue — не перезаписываем
+      // Запускаем проверку с замером времени
+      const startTime = Date.now();
+      this.currentStreamer = { streamer, startedAt: startTime };
 
-      // Пауза после проверки зависит от приоритета ПРОВЕРЕННОГО стримера
-      if (this.queue.length > 0) {
-        const priority = streamer.priority || 1;
-        const rawDelay = this.streamerDelays[priority];
-        const delay = rawDelay !== null ? rawDelay : 10000 + Math.random() * 5000;
-        console.log(`  ⏳ Пауза ${Math.round(delay / 1000)}с...`);
-        await this.sleep(delay);
-      }
+      await this.checkStreamer(streamer);
+
+      const duration = Date.now() - startTime;
+      this.recordDuration(streamer.id, duration);
+      this.currentStreamer = null;
+
+      console.log(`  ⏱ Время проверки: ${Math.round(duration / 1000)}с`);
+
+      if (this.queue.length === 0) break;
+
+      // Умная пауза
+      const priority = streamer.priority || 1;
+      const baseDelay = this.baseDelays[priority] || 15000;
+      await this.smartDelay(baseDelay, duration);
     }
 
     this.workerBusy = false;
+  }
+
+  /**
+   * Умная пауза: если есть VIP/High который влезет — проверяем его
+   * вместо ожидания. Иначе просто ждём baseDelay.
+   */
+  async smartDelay(baseDelay, lastCheckDuration) {
+    // Проверяем: можно ли вставить кого-то в паузу
+    const candidate = this.findGapCandidate(baseDelay);
+
+    if (candidate) {
+      // Есть кандидат — небольшая пауза, затем проверяем его
+      const prePause = 3000; // 3с между проверками всегда
+      const remaining = baseDelay - this.estimateDuration(candidate.streamer.id) - prePause;
+
+      console.log(`  💡 Вставка в паузу: ${candidate.streamer.nickname} [P${candidate.streamer.priority}] (est. ${Math.round(this.estimateDuration(candidate.streamer.id)/1000)}с, остаток ~${Math.round(Math.max(0,remaining)/1000)}с)`);
+
+      this.addPlanLog({
+        type: 'gap_insert',
+        nickname: candidate.streamer.nickname,
+        priority: candidate.streamer.priority || 1,
+        estimatedMs: this.estimateDuration(candidate.streamer.id),
+        baseDelay
+      });
+
+      // Извлекаем кандидата из очереди
+      this.queue.splice(candidate.index, 1);
+      this.queuedIds.delete(candidate.streamer.id);
+
+      await this.sleep(prePause);
+
+      const gapStart = Date.now();
+      this.currentStreamer = { streamer: candidate.streamer, startedAt: gapStart };
+      await this.checkStreamer(candidate.streamer);
+      const gapDuration = Date.now() - gapStart;
+      this.recordDuration(candidate.streamer.id, gapDuration);
+      this.currentStreamer = null;
+
+      console.log(`  ⏱ Вставка завершена за ${Math.round(gapDuration/1000)}с`);
+
+      // Ждём остаток паузы (минимум 3с)
+      const postPause = Math.max(3000, remaining - gapDuration);
+      if (postPause > 500) {
+        console.log(`  ⏳ Остаток паузы: ${Math.round(postPause/1000)}с`);
+        await this.sleep(postPause);
+      }
+    } else {
+      console.log(`  ⏳ Пауза ${Math.round(baseDelay/1000)}с...`);
+      await this.sleep(baseDelay);
+    }
   }
 
   // ─── Проверка стримера ────────────────────────────────────────────────────
@@ -212,11 +313,11 @@ class Scheduler {
       const currentItems = result.wishlist;
       const existingItems = await db.getWishlistItems(streamer.id);
 
-      console.log(`  API: ${currentItems.length} товаров | БД: ${existingItems.length} товаров`);
+      console.log(`  API: ${currentItems.length} | БД: ${existingItems.length}`);
 
       // Защиты от ложных данных
       if (currentItems.length === 0 && existingItems.length > 10) {
-        console.log(`  ⚠ 0 товаров при ${existingItems.length} в БД — пропускаем (неполная загрузка?)`);
+        console.log(`  ⚠ 0 товаров при ${existingItems.length} в БД — пропускаем`);
         return;
       }
       if (existingItems.length > 10 && currentItems.length > 0 && currentItems.length < 5) {
@@ -236,7 +337,7 @@ class Scheduler {
 
       if (newItems.length > 0) {
         if (existingItems.length === 0 && currentItems.length > 2) {
-          console.log(`  ⚠ База пустая, первая синхронизация — без уведомлений`);
+          console.log(`  ⚠ Первая синхронизация — без уведомлений`);
         } else {
           const followers = await db.getStreamerFollowers(streamer.id);
           for (const f of followers) await this.sendNotificationToUser(f, streamer, newItems);
@@ -276,7 +377,7 @@ class Scheduler {
         streamer.fetta_url, newItems, false
       );
     } catch (err) {
-      console.error(`  ✗ Уведомление группа ${group.title}: ${err.message}`);
+      console.error(`  ✗ Группа ${group.title}: ${err.message}`);
     }
   }
 
@@ -284,7 +385,7 @@ class Scheduler {
 
   isWithinWorkingHours() {
     const h = new Date().getUTCHours();
-    return h >= 4 || h < 1; // 7:00–3:00 МСК
+    return h >= 4 || h < 1;
   }
 
   sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -296,10 +397,29 @@ class Scheduler {
   }
 
   getQueueStatus() {
+    const historyOut = {};
+    for (const [id, hist] of this.checkHistory) {
+      historyOut[id] = {
+        avg: Math.round(hist.reduce((a, b) => a + b, 0) / hist.length),
+        samples: hist.length
+      };
+    }
     return {
-      queueLength: this.queue.length,
       workerBusy: this.workerBusy,
-      queued: this.queue.map(s => ({ id: s.id, nickname: s.nickname, priority: s.priority || 1 }))
+      currentStreamer: this.currentStreamer ? {
+        id: this.currentStreamer.streamer.id,
+        nickname: this.currentStreamer.streamer.nickname,
+        priority: this.currentStreamer.streamer.priority || 1,
+        runningMs: Date.now() - this.currentStreamer.startedAt
+      } : null,
+      queue: this.queue.map(s => ({
+        id: s.id,
+        nickname: s.nickname,
+        priority: s.priority || 1,
+        estimatedMs: this.estimateDuration(s.id)
+      })),
+      history: historyOut,
+      planLog: this.planLog.slice(0, 10)
     };
   }
 }
