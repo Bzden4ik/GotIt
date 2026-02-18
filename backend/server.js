@@ -654,7 +654,7 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
     <div class="sched-legend">
       <span><span class="dot-vip"></span> VIP — каждые 30с / пауза 3с</span>
       <span><span class="dot-high"></span> High — каждые 60с / пауза 5с</span>
-      <span><span class="dot-norm"></span> Normal — каждые 90с / пауза 10-15с</span>
+      <span><span class="dot-norm"></span> Normal — каждые ${parseInt(process.env.CHECK_INTERVAL)||60}с / пауза 10-15с</span>
     </div>
     <button class="sched-refresh" onclick="fetchScheduler()">↻ Обновить</button>
   </div>

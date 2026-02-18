@@ -25,7 +25,8 @@ class Scheduler {
 
     // Priority-based timing
     this.lastChecked = new Map(); // streamerId -> timestamp
-    this.checkIntervals = { 3: 30000, 2: 60000, 1: 90000 }; // VIP/High/Normal в мс
+    const normalInterval = (parseInt(process.env.CHECK_INTERVAL) || 60) * 1000;
+    this.checkIntervals = { 3: 30000, 2: 60000, 1: normalInterval }; // VIP/High/Normal в мс
     this.streamerDelays  = { 3: 3000,  2: 5000,  1: null };  // null = рандом 10-15с
     
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
@@ -83,14 +84,15 @@ class Scheduler {
       await db.updateSchedulerHeartbeat(this.schedulerId);
     }, 20000);
 
-    // Основной цикл проверки
+    // Основной цикл тикает каждые 5 секунд — каждый стример проверяется
+    // только когда истёк ЕГО собственный интервал (по приоритету)
     this.intervalId = setInterval(async () => {
       if (this.isWithinWorkingHours()) {
         await this.checkAllStreamers();
       }
-    }, intervalSeconds * 1000);
+    }, 5000);
 
-    console.log('✅ Планировщик запущен успешно');
+    console.log('✅ Планировщик запущен (тик каждые 5с, интервалы по приоритету: VIP=30с, High=60с, Normal=' + intervalSeconds + 'с)');
 
     // Первая проверка через 10 секунд
     setTimeout(() => {
