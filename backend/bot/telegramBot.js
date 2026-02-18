@@ -564,6 +564,58 @@ class TelegramBot {
   }
 
   /**
+   * Рассылка сообщения всем пользователям / группам
+   * target: 'dm' | 'groups' | 'all'
+   * onProgress(sent, total) — колбэк прогресса
+   */
+  async broadcastMessage(dmMessage, groupMessage, target, onProgress) {
+    const results = { dmSent: 0, dmFailed: 0, groupSent: 0, groupFailed: 0 };
+    const DELAY_MS = 250; // 250ms между отправками
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // Отправка в ЛС
+    if (target === 'dm' || target === 'all') {
+      let users = [];
+      try { users = await db.getAllUsers(); } catch (e) { log.error(`broadcast: ошибка получения users: ${e.message}`); }
+
+      for (const user of users) {
+        if (!user.telegram_id) continue;
+        try {
+          await this.sendMessage(user.telegram_id, dmMessage, { parse_mode: 'HTML', disable_web_page_preview: true });
+          results.dmSent++;
+        } catch (e) {
+          log.warn(`broadcast DM: не удалось ${user.telegram_id}: ${e.message}`);
+          results.dmFailed++;
+        }
+        if (onProgress) onProgress(results);
+        await sleep(DELAY_MS);
+      }
+    }
+
+    // Отправка в группы
+    if (target === 'groups' || target === 'all') {
+      let groups = [];
+      try { groups = await db.getAllGroups(); } catch (e) { log.error(`broadcast: ошибка получения groups: ${e.message}`); }
+
+      for (const group of groups) {
+        if (!group.chat_id) continue;
+        try {
+          await this.sendMessage(group.chat_id, groupMessage, { parse_mode: 'HTML', disable_web_page_preview: true });
+          results.groupSent++;
+        } catch (e) {
+          log.warn(`broadcast Group: не удалось ${group.chat_id}: ${e.message}`);
+          results.groupFailed++;
+        }
+        if (onProgress) onProgress(results);
+        await sleep(DELAY_MS * 2); // группы чуть медленнее
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Установить webhook
    */
   async setWebhook(url) {

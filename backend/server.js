@@ -525,6 +525,50 @@ app.get('/api/admin/scheduler/queue', adminAuth, (req, res) => {
   res.json({ success: true, ...schedulerRef.getQueueStatus() });
 });
 
+// === Broadcast ===
+const AIAssistant = require('./bot/aiAssistant');
+const broadcastJobs = new Map(); // jobId -> { status, results, done }
+
+// Предпросмотр: генерируем ЛС и групповую версию через AI
+app.post('/api/admin/broadcast/preview', adminAuth, asyncHandler(async (req, res) => {
+  const { message } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ success: false, error: 'Нет текста' });
+
+  const ai = new AIAssistant();
+  const result = await ai.generateBroadcastMessages(message.trim());
+  if (!result) return res.status(500).json({ success: false, error: 'Ошибка генерации (Groq API недоступен?)' });
+
+  res.json({ success: true, dmVersion: result.dmVersion, groupVersion: result.groupVersion });
+}));
+
+// Запуск рассылки
+app.post('/api/admin/broadcast/send', adminAuth, asyncHandler(async (req, res) => {
+  const { dmMessage, groupMessage, target } = req.body;
+  if (!dmMessage || !groupMessage) return res.status(400).json({ success: false, error: 'Нет текстов' });
+  if (!['dm', 'groups', 'all'].includes(target)) return res.status(400).json({ success: false, error: 'target: dm|groups|all' });
+  if (!BOT_TOKEN) return res.status(500).json({ success: false, error: 'BOT_TOKEN не задан' });
+
+  const jobId = Math.random().toString(36).substring(2, 10);
+  const job = { done: false, results: { dmSent: 0, dmFailed: 0, groupSent: 0, groupFailed: 0 } };
+  broadcastJobs.set(jobId, job);
+
+  // Запускаем асинхронно (не ждём завершения)
+  const TelegramBot = require('./bot/telegramBot');
+  const bot = new TelegramBot(BOT_TOKEN);
+  bot.broadcastMessage(dmMessage, groupMessage, target, (r) => { job.results = r; })
+    .then(r => { job.results = r; job.done = true; console.log(`Broadcast #${jobId} завершён:`, r); })
+    .catch(e => { job.done = true; job.error = e.message; console.error(`Broadcast #${jobId} ошибка:`, e.message); });
+
+  res.json({ success: true, jobId });
+}));
+
+// Статус рассылки
+app.get('/api/admin/broadcast/status/:jobId', adminAuth, (req, res) => {
+  const job = broadcastJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ success: false, error: 'Job не найден' });
+  res.json({ success: true, done: job.done, results: job.results, error: job.error || null });
+});
+
 // === Telegram Webhook ===
 app.post('/webhook/telegram', async (req, res) => {
   try {
@@ -594,6 +638,27 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 .new-log{animation:flashIn .5s ease}
 @keyframes flashIn{from{background:#7ee8fa15}to{background:transparent}}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}
+.broadcast-panel{display:none;padding:24px;height:calc(100vh - 120px);overflow-y:auto;max-width:900px;margin:0 auto}
+.broadcast-panel.visible{display:block}
+.bc-title{font-size:15px;color:#7ee8fa;font-weight:600;margin-bottom:18px}
+.bc-label{font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.bc-textarea{width:100%;background:#111118;border:1px solid #2a2a3a;color:#ccc;padding:12px;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:80px;outline:none;transition:border-color .2s}
+.bc-textarea:focus{border-color:#7ee8fa}
+.bc-preview-box{background:#111118;border:1px solid #2a2a3a;border-radius:8px;padding:14px;font-size:13px;color:#ccc;line-height:1.6;white-space:pre-wrap;min-height:60px}
+.bc-preview-box.empty{color:#333;font-style:italic}
+.bc-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.bc-btn{padding:9px 20px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;border:1px solid;transition:all .2s;outline:none}
+.bc-btn-preview{background:#7ee8fa18;border-color:#7ee8fa44;color:#7ee8fa}.bc-btn-preview:hover{background:#7ee8fa33}
+.bc-btn-dm{background:#60a5fa18;border-color:#60a5fa44;color:#60a5fa}.bc-btn-dm:hover{background:#60a5fa33}
+.bc-btn-groups{background:#f59e0b18;border-color:#f59e0b44;color:#f59e0b}.bc-btn-groups:hover{background:#f59e0b33}
+.bc-btn-all{background:#4ade8018;border-color:#4ade8044;color:#4ade80}.bc-btn-all:hover{background:#4ade8033}
+.bc-btn:disabled{opacity:.4;cursor:not-allowed}
+.bc-section{margin-top:22px}
+.bc-progress{margin-top:14px;background:#111118;border:1px solid #2a2a3a;border-radius:8px;padding:14px;font-size:13px;display:none}
+.bc-progress.visible{display:block}
+.bc-progress-bar-wrap{background:#1a1a28;border-radius:4px;height:6px;margin:10px 0}
+.bc-progress-bar{height:6px;border-radius:4px;background:#4ade80;transition:width .5s}
+.bc-result{margin-top:8px;color:#555;font-size:12px}
 .sched-panel{display:none;padding:20px 24px;height:calc(100vh - 120px);overflow-y:auto}
 .sched-panel.visible{display:block}
 .sched-header{display:flex;gap:14px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
@@ -659,6 +724,7 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
     <button class="tab active" data-tab="server" onclick="switchTab('server')">Server</button>
     <button class="tab" data-tab="bot" onclick="switchTab('bot')">Bot <span class="badge" id="botBadge" style="display:none">0</span></button>
     <button class="tab" data-tab="scheduler" onclick="switchTab('scheduler')">Scheduler</button>
+    <button class="tab" data-tab="broadcast" onclick="switchTab('broadcast')">Broadcast</button>
   </div>
   <div class="status">
     <span class="dot"></span>
@@ -686,6 +752,46 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
   <button onclick="scrollToBottom()">↓</button>
 </div>
 <div class="log-container" id="logContainer"></div>
+<div class="broadcast-panel" id="broadcastPanel">
+  <div class="bc-title">📢 Рассылка от создателя</div>
+
+  <div class="bc-label">Сообщение от создателя (сырой текст)</div>
+  <textarea class="bc-textarea" id="bcRawText" placeholder="Напиши что нужно сообщить пользователям..."></textarea>
+  <div class="bc-row">
+    <button class="bc-btn bc-btn-preview" id="bcPreviewBtn" onclick="bcPreview()">✨ Предпросмотр</button>
+  </div>
+
+  <div id="bcPreviewSection" style="display:none">
+    <div class="bc-section">
+      <div class="bc-label">💬 Версия для ЛС (с обращением Сэмпай)</div>
+      <div class="bc-preview-box" id="bcDmPreview"></div>
+      <div style="margin-top:6px">
+        <textarea class="bc-textarea" id="bcDmEdit" style="min-height:60px" placeholder="Можно отредактировать..."></textarea>
+      </div>
+    </div>
+    <div class="bc-section">
+      <div class="bc-label">👥 Версия для групп</div>
+      <div class="bc-preview-box" id="bcGroupPreview"></div>
+      <div style="margin-top:6px">
+        <textarea class="bc-textarea" id="bcGroupEdit" style="min-height:60px" placeholder="Можно отредактировать..."></textarea>
+      </div>
+    </div>
+    <div class="bc-section">
+      <div class="bc-label">Отправить</div>
+      <div class="bc-row">
+        <button class="bc-btn bc-btn-dm" onclick="bcSend('dm')" id="bcBtnDm">💬 Только в ЛС</button>
+        <button class="bc-btn bc-btn-groups" onclick="bcSend('groups')" id="bcBtnGroups">👥 Только в группы</button>
+        <button class="bc-btn bc-btn-all" onclick="bcSend('all')" id="bcBtnAll">📢 Всем</button>
+      </div>
+    </div>
+    <div class="bc-progress" id="bcProgress">
+      <span id="bcProgressText">Идёт рассылка...</span>
+      <div class="bc-progress-bar-wrap"><div class="bc-progress-bar" id="bcProgressBar" style="width:0%"></div></div>
+      <div class="bc-result" id="bcResult"></div>
+    </div>
+  </div>
+</div>
+
 <div class="sched-panel" id="schedPanel">
   <div class="sched-header">
     <b style="color:#7ee8fa;font-size:14px">⏱ Приоритеты проверки стримеров</b>
@@ -724,18 +830,83 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 <script>
 const T='${token}';
 let tab='server',filter='',auto=true,lastCount=0,timer;
+
+// === Broadcast ===
+let bcJobId=null,bcPollTimer=null;
+async function bcPreview(){
+  const raw=document.getElementById('bcRawText').value.trim();
+  if(!raw)return;
+  const btn=document.getElementById('bcPreviewBtn');
+  btn.textContent='⏳ Генерация...';btn.disabled=true;
+  try{
+    const r=await fetch('/api/admin/broadcast/preview?token='+T,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:raw})});
+    const d=await r.json();
+    if(!d.success){alert('Ошибка: '+d.error);return;}
+    document.getElementById('bcDmPreview').textContent=d.dmVersion;
+    document.getElementById('bcGroupPreview').textContent=d.groupVersion;
+    document.getElementById('bcDmEdit').value=d.dmVersion;
+    document.getElementById('bcGroupEdit').value=d.groupVersion;
+    document.getElementById('bcPreviewSection').style.display='block';
+    document.getElementById('bcProgress').classList.remove('visible');
+    document.getElementById('bcResult').textContent='';
+  }catch(e){alert('Ошибка запроса');}
+  finally{btn.textContent='✨ Предпросмотр';btn.disabled=false;}
+}
+async function bcSend(target){
+  const dm=document.getElementById('bcDmEdit').value.trim();
+  const grp=document.getElementById('bcGroupEdit').value.trim();
+  if(!dm||!grp){alert('Тексты пустые');return;}
+  if(!confirm(`Отправить рассылку: ${target === 'dm' ? 'личные сообщения' : target === 'groups' ? 'группы' : 'всем'}?`))return;
+  ['bcBtnDm','bcBtnGroups','bcBtnAll'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  const prog=document.getElementById('bcProgress');
+  prog.classList.add('visible');
+  document.getElementById('bcProgressText').textContent='Идёт рассылка...';
+  document.getElementById('bcProgressBar').style.width='5%';
+  document.getElementById('bcResult').textContent='';
+  try{
+    const r=await fetch('/api/admin/broadcast/send?token='+T,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dmMessage:dm,groupMessage:grp,target})});
+    const d=await r.json();
+    if(!d.success){alert('Ошибка: '+d.error);return;}
+    bcJobId=d.jobId;
+    bcPollTimer=setInterval(bcPollStatus,1000);
+  }catch(e){alert('Ошибка запуска');}
+}
+async function bcPollStatus(){
+  if(!bcJobId)return;
+  try{
+    const r=await fetch('/api/admin/broadcast/status/'+bcJobId+'?token='+T);
+    const d=await r.json();
+    if(!d.success)return;
+    const res=d.results;
+    const totalSent=(res.dmSent||0)+(res.groupSent||0);
+    const totalFailed=(res.dmFailed||0)+(res.groupFailed||0);
+    document.getElementById('bcProgressText').textContent=`Отправлено: ${totalSent} | Ошибок: ${totalFailed}`;
+    if(d.done){
+      clearInterval(bcPollTimer);bcPollTimer=null;bcJobId=null;
+      document.getElementById('bcProgressBar').style.width='100%';
+      document.getElementById('bcProgressText').textContent='✅ Рассылка завершена';
+      document.getElementById('bcResult').textContent=`ЛС: ${res.dmSent} усп. / ${res.dmFailed} ошиб. | Группы: ${res.groupSent} усп. / ${res.groupFailed} ошиб.`;
+      ['bcBtnDm','bcBtnGroups','bcBtnAll'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
+    } else {
+      document.getElementById('bcProgressBar').style.width=Math.min(90,5+totalSent*3)+'%';
+    }
+  }catch(e){}
+}
 let schedData={streamers:[],lastChecked:{},checkIntervals:{3:30000,2:60000,1:90000}};
 
 function switchTab(t){
   tab=t;lastCount=0;
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(b=>{if(b.getAttribute('data-tab')===t)b.classList.add('active');});
+  const isLog=(t==='server'||t==='bot');
   document.getElementById('webhookInfo').classList.toggle('visible',t==='bot');
-  document.getElementById('logContainer').style.display=(t==='scheduler')?'none':'block';
+  document.getElementById('logContainer').style.display=isLog?'block':'none';
+  document.getElementById('controls').style.display=isLog?'flex':'none';
   document.getElementById('schedPanel').classList.toggle('visible',t==='scheduler');
-  document.getElementById('controls').style.display=(t==='scheduler')?'none':'flex';
+  document.getElementById('broadcastPanel').classList.toggle('visible',t==='broadcast');
   if(t==='bot')document.getElementById('botBadge').style.display='none';
   if(t==='scheduler'){lastPlanLogKey='';fetchScheduler();return;}
+  if(t==='broadcast')return;
   fetchLogs();
 }
 function setFilter(l){filter=l;document.querySelectorAll('.controls button[id^="btn"]').forEach(b=>b.classList.remove('active'));

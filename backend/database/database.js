@@ -659,6 +659,32 @@ class DatabaseService {
   }
 
   /**
+   * Получить всех пользователей (broadcast)
+   */
+  async getAllUsers() {
+    try {
+      const result = await this.db.execute({ sql: 'SELECT * FROM users', args: [] });
+      return result.rows;
+    } catch (e) {
+      console.error('Ошибка getAllUsers:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Получить все группы (broadcast)
+   */
+  async getAllGroups() {
+    try {
+      const result = await this.db.execute({ sql: 'SELECT * FROM groups', args: [] });
+      return result.rows;
+    } catch (e) {
+      console.error('Ошибка getAllGroups:', e);
+      return [];
+    }
+  }
+
+  /**
    * Освободить лок планировщика
    */
   async releaseSchedulerLock(instanceId) {
