@@ -491,6 +491,33 @@ app.get('/api/admin/status', adminAuth, async (req, res) => {
 // Веб-панель
 app.get('/admin/logs', adminAuth, (req, res) => { res.send(getAdminPageHtml(ADMIN_TOKEN)); });
 
+// Список стримеров для вкладки Scheduler
+app.get('/api/admin/scheduler/streamers', adminAuth, async (req, res) => {
+  try {
+    const streamers = await db.getAllStreamersAdmin();
+    const lastChecked = schedulerRef ? schedulerRef.getLastCheckedMap() : {};
+    const checkIntervals = schedulerRef ? schedulerRef.checkIntervals : { 3: 30000, 2: 60000, 1: 90000 };
+    res.json({ success: true, streamers, lastChecked, checkIntervals });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Обновить приоритет стримера
+app.post('/api/admin/scheduler/streamer/:id/priority', adminAuth, async (req, res) => {
+  const { id } = req.params;
+  const { priority } = req.body;
+  if (![1, 2, 3].includes(Number(priority))) {
+    return res.status(400).json({ success: false, error: 'priority должен быть 1, 2 или 3' });
+  }
+  try {
+    await db.setStreamerPriority(parseInt(id), Number(priority));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // === Telegram Webhook ===
 app.post('/webhook/telegram', async (req, res) => {
   try {
@@ -560,12 +587,40 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 .new-log{animation:flashIn .5s ease}
 @keyframes flashIn{from{background:#7ee8fa15}to{background:transparent}}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:3px}
+.sched-panel{display:none;padding:16px 20px;height:calc(100vh - 110px);overflow-y:auto}
+.sched-panel.visible{display:block}
+.sched-header{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.sched-legend{display:flex;gap:10px;margin-left:auto;font-size:11px}
+.sched-legend span{display:flex;align-items:center;gap:4px}
+.dot-vip{width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block}
+.dot-high{width:8px;height:8px;border-radius:50%;background:#60a5fa;display:inline-block}
+.dot-norm{width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block}
+.sched-table{width:100%;border-collapse:collapse;font-size:12px}
+.sched-table th{text-align:left;padding:7px 10px;color:#555;border-bottom:1px solid #2a2a3a;font-weight:400;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+.sched-table td{padding:8px 10px;border-bottom:1px solid #111118;vertical-align:middle}
+.sched-table tr:hover td{background:#ffffff06}
+.p-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.p-3{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44}
+.p-2{background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa44}
+.p-1{background:#6b728022;color:#888;border:1px solid #6b728044}
+.prio-select{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:4px 8px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
+.prio-select:focus,.prio-select:hover{border-color:#7ee8fa;color:#7ee8fa}
+.sched-save{background:#7ee8fa22;border:1px solid #7ee8fa44;color:#7ee8fa;padding:3px 10px;border-radius:6px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .2s}
+.sched-save:hover{background:#7ee8fa44}
+.sched-save.saved{background:#4ade8022;border-color:#4ade8044;color:#4ade80}
+.last-check{color:#555;font-size:11px}
+.last-check.recent{color:#4ade80}
+.last-check.stale{color:#fbbf24}
+.sched-refresh{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:5px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
+.sched-refresh:hover{color:#7ee8fa;border-color:#7ee8fa}
+.interval-info{font-size:11px;color:#555;margin-top:4px}
 </style></head><body>
 <div class="header">
   <h1>GotIt Admin</h1>
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('server')">Server</button>
-    <button class="tab" onclick="switchTab('bot')">Bot <span class="badge" id="botBadge" style="display:none">0</span></button>
+    <button class="tab active" data-tab="server" onclick="switchTab('server')">Server</button>
+    <button class="tab" data-tab="bot" onclick="switchTab('bot')">Bot <span class="badge" id="botBadge" style="display:none">0</span></button>
+    <button class="tab" data-tab="scheduler" onclick="switchTab('scheduler')">Scheduler</button>
   </div>
   <div class="status">
     <span class="dot"></span>
@@ -580,7 +635,7 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
   <span>Pending: <b id="whPending">—</b></span>
   <span>Last error: <b id="whError">—</b></span>
 </div>
-<div class="controls">
+<div class="controls" id="controls">
   <button onclick="setFilter('')" class="active" id="btnAll">Все</button>
   <button onclick="setFilter('info')" id="btnInfo">INFO</button>
   <button onclick="setFilter('error')" id="btnError">ERRORS</button>
@@ -593,14 +648,46 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
   <button onclick="scrollToBottom()">↓</button>
 </div>
 <div class="log-container" id="logContainer"></div>
+<div class="sched-panel" id="schedPanel">
+  <div class="sched-header">
+    <b style="color:#7ee8fa;font-size:14px">⏱ Приоритеты проверки стримеров</b>
+    <div class="sched-legend">
+      <span><span class="dot-vip"></span> VIP — каждые 30с / пауза 3с</span>
+      <span><span class="dot-high"></span> High — каждые 60с / пауза 5с</span>
+      <span><span class="dot-norm"></span> Normal — каждые 90с / пауза 10-15с</span>
+    </div>
+    <button class="sched-refresh" onclick="fetchScheduler()">↻ Обновить</button>
+  </div>
+  <table class="sched-table">
+    <thead><tr>
+      <th>Стример</th>
+      <th>Приоритет</th>
+      <th>Подписчиков</th>
+      <th>Товаров</th>
+      <th>Последняя проверка</th>
+      <th>Следующая через</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="schedBody"><tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Загрузка...</td></tr></tbody>
+  </table>
+</div>
 <script>
 const T='${token}';
 let tab='server',filter='',auto=true,lastCount=0,timer;
-function switchTab(t){tab=t;lastCount=0;document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-document.querySelector('.tab[onclick*="'+t+'"]').classList.add('active');
-document.getElementById('webhookInfo').classList.toggle('visible',t==='bot');
-if(t==='bot')document.getElementById('botBadge').style.display='none';
-fetchLogs();}
+let schedData={streamers:[],lastChecked:{},checkIntervals:{3:30000,2:60000,1:90000}};
+
+function switchTab(t){
+  tab=t;lastCount=0;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>{if(b.getAttribute('data-tab')===t)b.classList.add('active');});
+  document.getElementById('webhookInfo').classList.toggle('visible',t==='bot');
+  document.getElementById('logContainer').style.display=(t==='scheduler')?'none':'block';
+  document.getElementById('schedPanel').classList.toggle('visible',t==='scheduler');
+  document.getElementById('controls').style.display=(t==='scheduler')?'none':'flex';
+  if(t==='bot')document.getElementById('botBadge').style.display='none';
+  if(t==='scheduler'){fetchScheduler();return;}
+  fetchLogs();
+}
 function setFilter(l){filter=l;document.querySelectorAll('.controls button[id^="btn"]').forEach(b=>b.classList.remove('active'));
 document.getElementById(l?'btn'+l.charAt(0).toUpperCase()+l.slice(1):'btnAll').classList.add('active');fetchLogs();}
 function toggleAuto(){auto=!auto;document.getElementById('btnAuto').textContent='Auto: '+(auto?'ON':'OFF');
@@ -633,8 +720,74 @@ document.getElementById('whPending').textContent=w.pending_update_count||0;
 document.getElementById('whError').textContent=w.last_error_message||'нет';
 document.getElementById('whError').className=w.last_error_message?'err':'ok';}
 }catch(e){}}
-function startAuto(){clearInterval(timer);timer=setInterval(()=>{if(auto){fetchLogs();fetchStatus();}},3000);}
+function startAuto(){clearInterval(timer);timer=setInterval(()=>{if(auto){if(tab==='scheduler')fetchScheduler();else{fetchLogs();fetchStatus();}}},3000);}
 fetchLogs();fetchStatus();startAuto();
+
+async function fetchScheduler(){try{
+  const r=await fetch('/api/admin/scheduler/streamers?token='+T);
+  const d=await r.json();if(!d.success)return;
+  schedData=d;renderScheduler();
+}catch(e){}}
+
+function fmtAgo(ts){
+  if(!ts)return'<span class="last-check">—</span>';
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<5)return'<span class="last-check recent">только что</span>';
+  if(s<120)return'<span class="last-check recent">'+s+'с назад</span>';
+  if(s<3600)return'<span class="last-check stale">'+Math.floor(s/60)+'м назад</span>';
+  return'<span class="last-check stale">'+Math.floor(s/3600)+'ч назад</span>';
+}
+
+function fmtNext(ts,priority){
+  if(!ts)return'<span style="color:#555">—</span>';
+  const interval=schedData.checkIntervals[priority]||90000;
+  const remaining=Math.max(0,Math.round((interval-(Date.now()-ts))/1000));
+  if(remaining===0)return'<span style="color:#4ade80">сейчас</span>';
+  return'<span style="color:#7ee8fa">~'+remaining+'с</span>';
+}
+
+const PLABELS={3:'VIP',2:'High',1:'Normal'};
+const PCLASS={3:'p-3',2:'p-2',1:'p-1'};
+
+function renderScheduler(){
+  const tbody=document.getElementById('schedBody');
+  if(!schedData.streamers.length){tbody.innerHTML='<tr><td colspan="7" style="color:#555;text-align:center;padding:20px">Нет стримеров</td></tr>';return;}
+  tbody.innerHTML=schedData.streamers.map(s=>{
+    const p=s.priority||1;
+    const ts=schedData.lastChecked[s.id]||0;
+    return'<tr>'+
+      '<td><b style="color:#ccc">'+esc(s.nickname)+'</b>'+(s.name&&s.name!==s.nickname?'<br><span style="color:#555;font-size:11px">'+esc(s.name)+'</span>':'')+'</td>'+
+      '<td><span class="p-badge '+PCLASS[p]+'">'+PLABELS[p]+'</span></td>'+
+      '<td style="color:#888">'+s.followers_count+'</td>'+
+      '<td style="color:#888">'+s.items_count+'</td>'+
+      '<td>'+fmtAgo(ts)+'</td>'+
+      '<td>'+fmtNext(ts,p)+'</td>'+
+      '<td style="display:flex;gap:6px;align-items:center">'+
+        '<select class="prio-select" id="psel_'+s.id+'" onchange="savePriority('+s.id+',this)">'+
+          '<option value="3"'+(p===3?' selected':'')+'>VIP</option>'+
+          '<option value="2"'+(p===2?' selected':'')+'>High</option>'+
+          '<option value="1"'+(p===1?' selected':'')+'>Normal</option>'+
+        '</select>'+
+        '<button class="sched-save" id="sbtn_'+s.id+'" onclick="savePriority('+s.id+',document.getElementById(\'psel_'+s.id+'\'))">Сохранить</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+async function savePriority(id,sel){
+  const priority=parseInt(sel.value);
+  const btn=document.getElementById('sbtn_'+id);
+  btn.textContent='...';
+  try{
+    const r=await fetch('/api/admin/scheduler/streamer/'+id+'/priority?token='+T,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({priority})
+    });
+    const d=await r.json();
+    if(d.success){btn.textContent='✓';btn.classList.add('saved');setTimeout(()=>{btn.textContent='Сохранить';btn.classList.remove('saved');fetchScheduler();},1500);}
+    else{btn.textContent='Ошибка';}
+  }catch(e){btn.textContent='Ошибка';}
+}
 </script></body></html>`;
 }
 

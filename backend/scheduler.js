@@ -22,6 +22,11 @@ class Scheduler {
     this.intervalId = null;
     this.heartbeatId = null;
     this.hasLock = false;
+
+    // Priority-based timing
+    this.lastChecked = new Map(); // streamerId -> timestamp
+    this.checkIntervals = { 3: 30000, 2: 60000, 1: 90000 }; // VIP/High/Normal в мс
+    this.streamerDelays  = { 3: 3000,  2: 5000,  1: null };  // null = рандом 10-15с
     
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
     
@@ -171,17 +176,38 @@ class Scheduler {
       
       console.log(`Найдено стримеров: ${streamers.length}, уникальных: ${uniqueStreamers.length}`);
       
+      // Сортируем по приоритету (VIP первые)
+      uniqueStreamers.sort((a, b) => (b.priority || 1) - (a.priority || 1));
+
+      const now = Date.now();
+      let checkedCount = 0;
+
       for (const streamer of uniqueStreamers) {
+        const priority = streamer.priority || 1;
+        const minInterval = this.checkIntervals[priority] || 90000;
+        const lastCheck = this.lastChecked.get(streamer.id) || 0;
+        const elapsed = now - lastCheck;
+
+        if (elapsed < minInterval) {
+          const remaining = Math.round((minInterval - elapsed) / 1000);
+          console.log(`  ⏭ ${streamer.nickname} [P${priority}] — пропуск (ещё ${remaining}с)`);
+          continue;
+        }
+
         await this.checkStreamer(streamer);
-        
-        // КРИТИЧНО: Длинная задержка между стримерами (10-15 секунд)
-        if (uniqueStreamers.indexOf(streamer) < uniqueStreamers.length - 1) {
-          const delay = 10000 + Math.random() * 5000; // 10-15 секунд
-          console.log(`  ⏳ Пауза ${Math.round(delay/1000)}с перед следующим стримером...`);
-          await this.sleep(delay); // ВАЖНО: await обязательно!
+        this.lastChecked.set(streamer.id, Date.now());
+        checkedCount++;
+
+        // Задержка зависит от приоритета следующего стримера в очереди
+        const nextIdx = uniqueStreamers.indexOf(streamer) + 1;
+        if (nextIdx < uniqueStreamers.length) {
+          const rawDelay = this.streamerDelays[priority];
+          const delay = rawDelay !== null ? rawDelay : 10000 + Math.random() * 5000;
+          console.log(`  ⏳ Пауза ${Math.round(delay / 1000)}с перед следующим стримером...`);
+          await this.sleep(delay);
         }
       }
-      console.log('=== Проверка завершена ===\n');
+      console.log(`=== Проверка завершена (проверено: ${checkedCount}/${uniqueStreamers.length}) ===\n`);
     } catch (error) {
       console.error('Ошибка при проверке стримеров:', error);
     } finally {
@@ -191,7 +217,7 @@ class Scheduler {
 
   async checkStreamer(streamer) {
     try {
-      console.log(`\nПроверка стримера: ${streamer.nickname}`);
+      console.log(`\nПроверка стримера: ${streamer.nickname} [P${streamer.priority || 1}]`);
       
       let result = null;
       let retryCount = 0;
@@ -350,6 +376,14 @@ class Scheduler {
   }
 
   sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  getLastCheckedMap() {
+    const result = {};
+    for (const [id, ts] of this.lastChecked.entries()) {
+      result[id] = ts;
+    }
+    return result;
+  }
 }
 
 module.exports = Scheduler;

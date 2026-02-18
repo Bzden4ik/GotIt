@@ -14,6 +14,12 @@ class DatabaseService {
   }
 
   async init() {
+    // Миграция: добавляем priority если ещё нет
+    try {
+      await this.db.execute('ALTER TABLE streamers ADD COLUMN priority INTEGER DEFAULT 1');
+      console.log('✅ Колонка priority добавлена в streamers');
+    } catch (e) { /* уже существует */ }
+
     await this.db.batch([
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -404,13 +410,37 @@ class DatabaseService {
   async getAllTrackedStreamers() {
     // DISTINCT по nickname (case-insensitive) чтобы избежать дублей
     const rs = await this.db.execute(
-      `SELECT s.id, s.nickname, s.name, s.username, s.avatar, s.description, s.fetta_url, s.created_at, s.updated_at 
+      `SELECT s.id, s.nickname, s.name, s.username, s.avatar, s.description, s.fetta_url, s.created_at, s.updated_at, COALESCE(s.priority, 1) as priority
        FROM streamers s 
        JOIN user_streamers us ON s.id = us.streamer_id
        GROUP BY LOWER(s.nickname)
-       ORDER BY s.id ASC`
+       ORDER BY COALESCE(s.priority, 1) DESC, s.id ASC`
     );
     return rs.rows;
+  }
+
+  // ── Приоритеты планировщика ──
+
+  async getAllStreamersAdmin() {
+    const rs = await this.db.execute(
+      `SELECT 
+         s.id, s.nickname, s.name, s.avatar, COALESCE(s.priority, 1) as priority,
+         COUNT(DISTINCT us.user_id) as followers_count,
+         COUNT(DISTINCT wi.id) as items_count
+       FROM streamers s
+       LEFT JOIN user_streamers us ON s.id = us.streamer_id
+       LEFT JOIN wishlist_items wi ON s.id = wi.streamer_id
+       GROUP BY s.id
+       ORDER BY COALESCE(s.priority, 1) DESC, s.id ASC`
+    );
+    return rs.rows;
+  }
+
+  async setStreamerPriority(streamerId, priority) {
+    await this.db.execute({
+      sql: 'UPDATE streamers SET priority = ? WHERE id = ?',
+      args: [priority, streamerId]
+    });
   }
 
   async getStreamerFollowers(streamerId) {
