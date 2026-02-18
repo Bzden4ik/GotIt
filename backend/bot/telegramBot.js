@@ -443,6 +443,17 @@ class TelegramBot {
 
         // Обычные сообщения - отправляем в AI
         if (!text.startsWith('/')) {
+          const isPrivate = update.message.chat.type === 'private';
+          const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+          const isReplyToBot = update.message.reply_to_message?.from?.is_bot &&
+            update.message.reply_to_message?.from?.username === botUsername;
+          const isMentioned = botUsername && text.toLowerCase().includes(`@${botUsername.toLowerCase()}`);
+
+          // В группах отвечаем ТОЛЬКО если ответили на сообщение бота или упомянули его
+          if (!isPrivate && !isReplyToBot && !isMentioned) {
+            return; // Молча игнорируем чужие сообщения в группах
+          }
+
           log.info(`AI сообщение от ${update.message.from.username || update.message.from.id}: "${text.substring(0, 50)}..."`);
           await this.handleAIMessage(update.message);
           return;
