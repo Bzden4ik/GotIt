@@ -220,7 +220,8 @@ class FettaParser {
           page++;
 
           // Если API вернул totalPages — стоп как только прошли все страницы
-          if (totalPages !== null && page >= totalPages) {
+          // +1 потому что мы пропускаем p=1 (дубль p=0), поэтому последняя реальная страница = totalPages
+          if (totalPages !== null && page > totalPages) {
             console.log(`  Достигнута последняя страница (totalPages=${totalPages}), стоп`);
             break;
           }
