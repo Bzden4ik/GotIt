@@ -100,10 +100,12 @@ class Scheduler {
   // ─── Очередь ──────────────────────────────────────────────────────────────
 
   async enqueueDueStreamers() {
-    // Watchdog: если воркер завис дольше 3 минут — принудительный сброс
-    const WORKER_TIMEOUT = 3 * 60 * 1000;
-    if (this.workerBusy && this.workerStartedAt && (Date.now() - this.workerStartedAt) > WORKER_TIMEOUT) {
-      console.warn('⚠ Watchdog: воркер завис >3 мин, принудительный сброс');
+    // Watchdog: если текущий стример проверяется дольше 5 минут — принудительный сброс
+    const WORKER_TIMEOUT = 5 * 60 * 1000;
+    const watchdogTs = this.currentStreamer?.startedAt ?? this.workerStartedAt;
+    if (this.workerBusy && watchdogTs && (Date.now() - watchdogTs) > WORKER_TIMEOUT) {
+      const nick = this.currentStreamer?.streamer?.nickname ?? '?';
+      console.warn(`⚠ Watchdog: стример ${nick} проверяется >5 мин, принудительный сброс`);
       this.workerBusy = false;
       this.currentStreamer = null;
       this.workerStartedAt = null;
@@ -225,6 +227,7 @@ class Scheduler {
 
         const startTime = Date.now();
         this.currentStreamer = { streamer, startedAt: startTime };
+        this.workerStartedAt = startTime; // обновляем watchdog-таймер на каждый стример
 
         try {
           await this.checkStreamer(streamer);
@@ -290,6 +293,7 @@ class Scheduler {
 
       const gapStart = Date.now();
       this.currentStreamer = { streamer: candidate.streamer, startedAt: gapStart };
+      this.workerStartedAt = gapStart; // обновляем watchdog-таймер
       await this.checkStreamer(candidate.streamer);
       const gapDuration = Date.now() - gapStart;
       this.recordDuration(candidate.streamer.id, gapDuration);
