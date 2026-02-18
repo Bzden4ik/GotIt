@@ -29,6 +29,7 @@ class Scheduler {
     this.queue      = [];        // [{ streamer, addedAt }]
     this.queuedIds  = new Set();
     this.workerBusy = false;
+    this.workerSession = 0; // инкрементируется при каждом новом запуске воркера
     this.lastChecked = new Map(); // id -> timestamp постановки в очередь
 
     // Умный планировщик
@@ -106,6 +107,7 @@ class Scheduler {
     if (this.workerBusy && watchdogTs && (Date.now() - watchdogTs) > WORKER_TIMEOUT) {
       const nick = this.currentStreamer?.streamer?.nickname ?? '?';
       console.warn(`⚠ Watchdog: стример ${nick} проверяется >5 мин, принудительный сброс`);
+      this.workerSession++; // инвалидируем zombie-воркер
       this.workerBusy = false;
       this.currentStreamer = null;
       this.workerStartedAt = null;
@@ -219,9 +221,16 @@ class Scheduler {
     if (this.workerBusy) return;
     this.workerBusy = true;
     this.workerStartedAt = Date.now();
+    const mySession = ++this.workerSession; // захватываем текущую сессию
 
     try {
       while (this.queue.length > 0) {
+        // Проверяем что нас не вытеснил watchdog
+        if (this.workerSession !== mySession) {
+          console.warn('⚠ Воркер вытеснен watchdog-ом, выход');
+          return;
+        }
+
         const streamer = this.queue.shift();
         this.queuedIds.delete(streamer.id);
 
@@ -243,6 +252,12 @@ class Scheduler {
 
         if (this.queue.length === 0) break;
 
+        // Снова проверяем сессию перед паузой
+        if (this.workerSession !== mySession) {
+          console.warn('⚠ Воркер вытеснен watchdog-ом перед паузой, выход');
+          return;
+        }
+
         try {
           const priority = streamer.priority || 1;
           const baseDelay = this.baseDelays[priority] || 15000;
@@ -256,8 +271,11 @@ class Scheduler {
       console.error('✗ Критическая ошибка воркера:', err.message);
     } finally {
       this.currentStreamer = null;
-      this.workerBusy = false;
-      this.workerStartedAt = null;
+      // Сбрасываем флаги только если мы всё ещё владеем сессией
+      if (this.workerSession === mySession) {
+        this.workerBusy = false;
+        this.workerStartedAt = null;
+      }
       console.log('✓ Воркер завершил работу');
     }
   }
