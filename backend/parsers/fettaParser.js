@@ -170,6 +170,12 @@ class FettaParser {
 
       while (hasMore && emptyPagesCount < maxEmptyPages && consecutiveErrors < maxErrors) {
         try {
+          // p=1 на fetta.app всегда возвращает те же данные что p=0 — пропускаем
+          if (page === 1) {
+            page++;
+            continue;
+          }
+
           const response = await axios.get(
             `${this.apiUrl}/product/products/public/get`,
             { 
@@ -179,7 +185,10 @@ class FettaParser {
           );
 
           const data = response.data;
-          consecutiveErrors = 0; // Сброс счётчика ошибок при успехе
+          consecutiveErrors = 0;
+
+          // Если API сообщает totalPages — используем его чтобы не запрашивать несуществующие страницы
+          const totalPages = data.totalPages ?? null;
           
           if (data.products && data.products.length > 0) {
             let newProducts = 0;
@@ -195,11 +204,12 @@ class FettaParser {
               }
             }
             
-            console.log(`  Страница p=${page}: ${data.products.length} товаров (новых: ${newProducts}, дублей: ${duplicates})`);
-            
             if (newProducts === 0) {
+              // Все товары дубли — дальше тоже будут дубли, останавливаемся
+              console.log(`  Страница p=${page}: ${data.products.length} товаров (все дубли — считается пустой, стоп)`);
               emptyPagesCount++;
             } else {
+              console.log(`  Страница p=${page}: ${data.products.length} товаров (новых: ${newProducts}, дублей: ${duplicates})`);
               emptyPagesCount = 0;
             }
           } else {
@@ -208,6 +218,12 @@ class FettaParser {
           }
           
           page++;
+
+          // Если API вернул totalPages — стоп как только прошли все страницы
+          if (totalPages !== null && page >= totalPages) {
+            console.log(`  Достигнута последняя страница (totalPages=${totalPages}), стоп`);
+            break;
+          }
           
           // КРИТИЧНО: Задержка между страницами
           if (page <= 10) {
