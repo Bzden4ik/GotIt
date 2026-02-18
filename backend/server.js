@@ -768,7 +768,7 @@ function renderScheduler(){
           '<option value="2"'+(p===2?' selected':'')+'>High</option>'+
           '<option value="1"'+(p===1?' selected':'')+'>Normal</option>'+
         '</select>'+
-        '<button class="sched-save" id="sbtn_'+s.id+'" onclick="savePriority('+s.id+',document.getElementById(\'psel_'+s.id+'\'))">Сохранить</button>'+
+        '<button class="sched-save" id="sbtn_'+s.id+'" onclick="savePriority('+s.id+',this.previousElementSibling)">Сохранить</button>'+
       '</td>'+
     '</tr>';
   }).join('');
