@@ -2,389 +2,305 @@ const fettaParser = require('./parsers/fettaParser');
 const db = require('./database/database');
 const TelegramBot = require('./bot/telegramBot');
 
-// Глобальная переменная для отслеживания запущенного планировщика
 let globalSchedulerInstance = null;
 
 class Scheduler {
   constructor(botToken) {
-    // Проверяем что не создан другой экземпляр
     if (globalSchedulerInstance) {
       console.log('⚠ Планировщик уже создан, используем существующий экземпляр');
       return globalSchedulerInstance;
     }
-    
+
     console.log('📅 Создание нового экземпляра планировщика');
-    
-    this.schedulerId = Math.random().toString(36).substring(7); // Уникальный ID
+
+    this.schedulerId = Math.random().toString(36).substring(7);
     this.bot = botToken ? new TelegramBot(botToken) : null;
     this.isRunning = false;
-    this.isChecking = false; // НОВЫЙ флаг для предотвращения параллельных проверок
     this.intervalId = null;
     this.heartbeatId = null;
     this.hasLock = false;
 
-    // Priority-based timing
-    this.lastChecked = new Map(); // streamerId -> timestamp
+    // Priority-based intervals
     const normalInterval = (parseInt(process.env.CHECK_INTERVAL) || 60) * 1000;
-    this.checkIntervals = { 3: 30000, 2: 60000, 1: normalInterval }; // VIP/High/Normal в мс
-    this.streamerDelays  = { 3: 3000,  2: 5000,  1: null };  // null = рандом 10-15с
-    
+    this.checkIntervals = { 3: 30000, 2: 60000, 1: normalInterval };
+    this.streamerDelays  = { 3: 3000,  2: 5000,  1: null }; // null = 10-15с рандом
+
+    // Priority queue: массив { streamer, addedAt }
+    // Воркер берёт по одному — нет параллельных запросов к fetta.app
+    this.queue = [];
+    this.queuedIds = new Set();   // чтобы не добавлять одного стримера дважды
+    this.workerBusy = false;
+    this.lastChecked = new Map(); // streamerId -> timestamp последней проверки
+
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
-    
     globalSchedulerInstance = this;
   }
 
-  async start(intervalSeconds = 30) {
+  // ─── Запуск ───────────────────────────────────────────────────────────────
+
+  async start(intervalSeconds = 60) {
     if (this.isRunning) {
-      console.log('⚠ Планировщик уже запущен, пропускаем повторный запуск');
+      console.log('⚠ Планировщик уже запущен');
       return;
     }
 
-    console.log(`🚀 Запуск планировщика: каждые ${intervalSeconds} секунд, с 7:00 до 3:00 МСК (ночью)`);
-
-    // Пытаемся захватить лок
     this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
-
     if (!this.hasLock) {
-      console.log('⚠ Лок занят другим инстансом, планировщик не запущен');
-      console.log('💡 Если это единственный инстанс, лок освободится через 60 сек');
-
-      // Пробуем захватить лок каждые 30 секунд (сохраняем в отдельную переменную!)
+      console.log('⚠ Лок занят другим инстансом');
       this.retryIntervalId = setInterval(async () => {
-        if (this.isRunning) return; // Уже запущен — не трогаем
-
+        if (this.isRunning) return;
         this.hasLock = await db.tryAcquireSchedulerLock(this.schedulerId);
         if (this.hasLock) {
-          console.log('🔒 Лок захвачен! Запускаем проверки...');
-          // ВАЖНО: Очищаем retry-интервал перед запуском проверок!
           clearInterval(this.retryIntervalId);
           this.retryIntervalId = null;
-          this.startChecks(intervalSeconds);
+          this.startChecks();
         }
       }, 30000);
-
       return;
     }
 
-    console.log('🔒 Лок захвачен успешно');
-    this.startChecks(intervalSeconds);
+    console.log('🔒 Лок захвачен');
+    this.startChecks();
   }
 
-  startChecks(intervalSeconds) {
-    // Защита от повторного вызова
-    if (this.isRunning) {
-      console.log('⚠ startChecks() вызван повторно, пропускаем');
-      return;
-    }
-
+  startChecks() {
+    if (this.isRunning) return;
     this.isRunning = true;
 
-    // Heartbeat каждые 20 секунд
-    this.heartbeatId = setInterval(async () => {
-      await db.updateSchedulerHeartbeat(this.schedulerId);
-    }, 20000);
+    // Heartbeat
+    this.heartbeatId = setInterval(() => db.updateSchedulerHeartbeat(this.schedulerId), 20000);
 
-    // Основной цикл тикает каждые 5 секунд — каждый стример проверяется
-    // только когда истёк ЕГО собственный интервал (по приоритету)
-    this.intervalId = setInterval(async () => {
-      if (this.isWithinWorkingHours()) {
-        await this.checkAllStreamers();
-      }
+    // Тик каждые 5с: добавляем в очередь стримеров, у которых истёк интервал
+    this.intervalId = setInterval(() => {
+      if (this.isWithinWorkingHours()) this.enqueueDueStreamers();
     }, 5000);
 
-    console.log('✅ Планировщик запущен (тик каждые 5с, интервалы по приоритету: VIP=30с, High=60с, Normal=' + intervalSeconds + 'с)');
+    const normalSec = Math.round((this.checkIntervals[1]) / 1000);
+    console.log(`✅ Планировщик запущен | VIP=30с High=60с Normal=${normalSec}с | тик=5с`);
 
-    // Первая проверка через 10 секунд
+    // Первый запуск через 10с
     setTimeout(() => {
-      if (this.isWithinWorkingHours()) {
-        console.log('Выполняется первая проверка стримеров...');
-        this.checkAllStreamers();
-      } else {
-        console.log('Пропуск первой проверки - вне рабочего времени');
-      }
+      if (this.isWithinWorkingHours()) this.enqueueDueStreamers();
     }, 10000);
   }
 
   async stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-
-    if (this.retryIntervalId) {
-      clearInterval(this.retryIntervalId);
-      this.retryIntervalId = null;
-    }
-
-    if (this.heartbeatId) {
-      clearInterval(this.heartbeatId);
-      this.heartbeatId = null;
-    }
-
+    clearInterval(this.intervalId);
+    clearInterval(this.heartbeatId);
+    clearInterval(this.retryIntervalId);
+    this.intervalId = this.heartbeatId = this.retryIntervalId = null;
     this.isRunning = false;
-    
-    // Освобождаем лок
     if (this.hasLock) {
       await db.releaseSchedulerLock(this.schedulerId);
       this.hasLock = false;
     }
-    
     console.log('✓ Планировщик остановлен');
   }
 
-  isWithinWorkingHours() {
-    const now = new Date();
-    const utcHours = now.getUTCHours();
-    // МСК = UTC+3
-    // 7:00 МСК = 4:00 UTC
-    // 3:00 МСК = 0:00 UTC (следующего дня)
-    // Работаем: 4:00-23:59 UTC и 0:00-0:59 UTC (то есть 7:00-3:00 МСК)
-    return utcHours >= 4 || utcHours < 1;
-  }
+  // ─── Очередь ──────────────────────────────────────────────────────────────
 
-  async checkAllStreamers() {
-    // ЗАЩИТА: Если уже выполняется проверка - пропускаем
-    if (this.isChecking) {
-      console.log('⚠ Проверка уже выполняется, пропускаем...');
+  async enqueueDueStreamers() {
+    let streamers;
+    try {
+      streamers = await db.getAllTrackedStreamers();
+    } catch (e) {
+      console.error('Ошибка получения стримеров:', e.message);
       return;
     }
-    
-    this.isChecking = true; // Устанавливаем флаг
-    
-    try {
-      console.log('\n=== Начало проверки стримеров ===');
-      console.log(`Время: ${new Date().toLocaleString('ru-RU')}`);
-      console.log(`Планировщик ID: ${this.schedulerId || 'legacy'}`);
-      
-      const streamers = await db.getAllTrackedStreamers();
-      if (streamers.length === 0) { 
-        console.log('Нет отслеживаемых стримеров'); 
-        return; 
+
+    if (!streamers.length) return;
+
+    // Дедупликация по nickname
+    const seen = new Set();
+    const unique = [];
+    for (const s of streamers) {
+      const key = s.nickname.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); unique.push(s); }
+    }
+
+    const now = Date.now();
+    let added = 0;
+
+    for (const streamer of unique) {
+      if (this.queuedIds.has(streamer.id)) continue; // уже в очереди
+
+      const priority = streamer.priority || 1;
+      const interval = this.checkIntervals[priority] || this.checkIntervals[1];
+      const last = this.lastChecked.get(streamer.id) || 0;
+
+      if (now - last >= interval) {
+        this.lastChecked.set(streamer.id, now); // помечаем сразу при постановке в очередь
+        this.enqueue(streamer);
+        added++;
       }
-      
-      // Убираем дубли по nickname (case-insensitive)
-      const uniqueStreamers = [];
-      const seenNicknames = new Set();
-      
-      for (const streamer of streamers) {
-        const nicknameLower = streamer.nickname.toLowerCase();
-        if (!seenNicknames.has(nicknameLower)) {
-          seenNicknames.add(nicknameLower);
-          uniqueStreamers.push(streamer);
-        } else {
-          console.log(`⚠ Пропущен дубль: ${streamer.nickname} (id: ${streamer.id})`);
-        }
-      }
-      
-      console.log(`Найдено стримеров: ${streamers.length}, уникальных: ${uniqueStreamers.length}`);
-      
-      // Сортируем по приоритету (VIP первые)
-      uniqueStreamers.sort((a, b) => (b.priority || 1) - (a.priority || 1));
+    }
 
-      const now = Date.now();
-      let checkedCount = 0;
-
-      for (const streamer of uniqueStreamers) {
-        const priority = streamer.priority || 1;
-        const minInterval = this.checkIntervals[priority] || 90000;
-        const lastCheck = this.lastChecked.get(streamer.id) || 0;
-        const elapsed = now - lastCheck;
-
-        if (elapsed < minInterval) {
-          const remaining = Math.round((minInterval - elapsed) / 1000);
-          console.log(`  ⏭ ${streamer.nickname} [P${priority}] — пропуск (ещё ${remaining}с)`);
-          continue;
-        }
-
-        await this.checkStreamer(streamer);
-        this.lastChecked.set(streamer.id, Date.now());
-        checkedCount++;
-
-        // Задержка зависит от приоритета следующего стримера в очереди
-        const nextIdx = uniqueStreamers.indexOf(streamer) + 1;
-        if (nextIdx < uniqueStreamers.length) {
-          const rawDelay = this.streamerDelays[priority];
-          const delay = rawDelay !== null ? rawDelay : 10000 + Math.random() * 5000;
-          console.log(`  ⏳ Пауза ${Math.round(delay / 1000)}с перед следующим стримером...`);
-          await this.sleep(delay);
-        }
-      }
-      console.log(`=== Проверка завершена (проверено: ${checkedCount}/${uniqueStreamers.length}) ===\n`);
-    } catch (error) {
-      console.error('Ошибка при проверке стримеров:', error);
-    } finally {
-      this.isChecking = false; // Снимаем флаг ВСЕГДА
+    if (added > 0) {
+      console.log(`📥 Добавлено в очередь: ${added} стримеров (в очереди всего: ${this.queue.length})`);
+      this.runWorker();
     }
   }
+
+  enqueue(streamer) {
+    // Вставляем по приоритету: VIP в начало, Normal в конец
+    const priority = streamer.priority || 1;
+    if (priority === 3) {
+      // VIP — в самое начало
+      this.queue.unshift(streamer);
+    } else if (priority === 2) {
+      // High — перед Normal, но после VIP
+      const firstNormal = this.queue.findIndex(s => (s.priority || 1) === 1);
+      if (firstNormal === -1) this.queue.push(streamer);
+      else this.queue.splice(firstNormal, 0, streamer);
+    } else {
+      this.queue.push(streamer);
+    }
+    this.queuedIds.add(streamer.id);
+  }
+
+  // ─── Воркер ───────────────────────────────────────────────────────────────
+
+  async runWorker() {
+    if (this.workerBusy) return; // воркер уже работает
+    this.workerBusy = true;
+
+    while (this.queue.length > 0) {
+      const streamer = this.queue.shift();
+      this.queuedIds.delete(streamer.id);
+
+      await this.checkStreamer(streamer);
+      // lastChecked уже выставлен при enqueue — не перезаписываем
+
+      // Пауза после проверки зависит от приоритета ПРОВЕРЕННОГО стримера
+      if (this.queue.length > 0) {
+        const priority = streamer.priority || 1;
+        const rawDelay = this.streamerDelays[priority];
+        const delay = rawDelay !== null ? rawDelay : 10000 + Math.random() * 5000;
+        console.log(`  ⏳ Пауза ${Math.round(delay / 1000)}с...`);
+        await this.sleep(delay);
+      }
+    }
+
+    this.workerBusy = false;
+  }
+
+  // ─── Проверка стримера ────────────────────────────────────────────────────
 
   async checkStreamer(streamer) {
     try {
-      console.log(`\nПроверка стримера: ${streamer.nickname} [P${streamer.priority || 1}]`);
-      
+      console.log(`\n▶ Проверка: ${streamer.nickname} [P${streamer.priority || 1}]`);
+
       let result = null;
-      let retryCount = 0;
-      const maxRetries = 2;
-      
-      // Retry логика для 429 ошибки
-      while (retryCount <= maxRetries) {
+      for (let attempt = 0; attempt <= 2; attempt++) {
         try {
           result = await fettaParser.getStreamerInfo(streamer.nickname);
-          break; // Успешно получили данные
-        } catch (error) {
-          if (error.message && error.message.includes('429')) {
-            retryCount++;
-            if (retryCount <= maxRetries) {
-              const waitTime = retryCount * 5; // 5, 10 секунд
-              console.log(`  ⚠ Rate limit (429), ожидание ${waitTime} сек (попытка ${retryCount}/${maxRetries})`);
-              await this.sleep(waitTime * 1000);
-            } else {
-              console.log(`  ✗ Превышен лимит попыток, пропускаем стримера`);
-              return;
-            }
-          } else {
-            throw error; // Другая ошибка - прокидываем дальше
-          }
+          break;
+        } catch (err) {
+          if (err.message?.includes('429') && attempt < 2) {
+            const wait = (attempt + 1) * 10;
+            console.log(`  ⚠ Rate limit, ждём ${wait}с (попытка ${attempt + 1}/2)`);
+            await this.sleep(wait * 1000);
+          } else throw err;
         }
       }
-      
-      if (!result || !result.success || !result.wishlist) {
-        console.log(`  ⚠ Не удалось получить вишлист для ${streamer.nickname}`);
+
+      if (!result?.success || !result.wishlist) {
+        console.log(`  ⚠ Не удалось получить вишлист`);
         return;
       }
-      
+
       const currentItems = result.wishlist;
-      console.log(`  Получено товаров из API: ${currentItems.length}`);
-
-      // Проверяем что есть в базе
       const existingItems = await db.getWishlistItems(streamer.id);
-      console.log(`  В базе сохранено товаров: ${existingItems.length}`);
 
-      // ЗАЩИТА 1: API вернул 0 товаров, но в базе есть много — подозрение на rate limit
-      // Примечание: реальный пустой вишлист (0 товаров) — это не rate limit.
-      // 429 rate limit выбрасывает исключение и обрабатывается retry-логикой выше.
-      // Если стример убрал все товары — API вернёт 200 с пустым списком, и это нормально.
-      // Защита срабатывает только при резком падении с большого числа (>10) до нуля.
+      console.log(`  API: ${currentItems.length} товаров | БД: ${existingItems.length} товаров`);
+
+      // Защиты от ложных данных
       if (currentItems.length === 0 && existingItems.length > 10) {
-        console.log(`  ⚠ API вернул 0 товаров, но в базе ${existingItems.length} — подозрение на неполную загрузку`);
-        console.log(`  НЕ сохраняем!`);
+        console.log(`  ⚠ 0 товаров при ${existingItems.length} в БД — пропускаем (неполная загрузка?)`);
         return;
       }
-
-      // ЗАЩИТА 2: API вернул подозрительно мало товаров
-      if (existingItems.length > 10 && currentItems.length < 5 && currentItems.length > 0) {
-        console.log(`  ⚠ API вернул всего ${currentItems.length} товаров, но в базе ${existingItems.length}`);
-        console.log(`  Подозрение на rate limit - НЕ сохраняем!`);
+      if (existingItems.length > 10 && currentItems.length > 0 && currentItems.length < 5) {
+        console.log(`  ⚠ Подозрительно мало товаров — пропускаем`);
         return;
       }
-
-      // ЗАЩИТА 3: Резкое уменьшение количества (>30%)
       if (existingItems.length > 10 && currentItems.length > 0) {
-        const decrease = ((existingItems.length - currentItems.length) / existingItems.length) * 100;
-        if (decrease > 30) {
-          console.log(`  ⚠ Товаров уменьшилось на ${Math.round(decrease)}% (${existingItems.length} → ${currentItems.length})`);
-          console.log(`  Подозрение на неполную загрузку - НЕ сохраняем!`);
+        const drop = (existingItems.length - currentItems.length) / existingItems.length;
+        if (drop > 0.3) {
+          console.log(`  ⚠ Товаров упало на ${Math.round(drop * 100)}% — пропускаем`);
           return;
         }
       }
 
       const newItems = await db.getNewWishlistItems(streamer.id, currentItems);
-      console.log(`  Определено новых товаров: ${newItems.length}`);
+      console.log(`  Новых: ${newItems.length}`);
 
       if (newItems.length > 0) {
-        console.log(`  🎁 Найдено новых товаров: ${newItems.length}`);
-        newItems.forEach((item, i) => {
-          console.log(`    ${i + 1}. ${item.name?.substring(0, 60)} - ${item.price}`);
-        });
-        
-        // Защита: если база была пустая и товаров много - это первая синхронизация после миграции
         if (existingItems.length === 0 && currentItems.length > 2) {
-          console.log(`  ⚠ База пустая, но товаров много (${currentItems.length}), пропускаем уведомления`);
-          console.log(`  Вероятно это первая синхронизация после миграции или деплоя`);
+          console.log(`  ⚠ База пустая, первая синхронизация — без уведомлений`);
         } else {
-          // Получаем подписчиков стримера
           const followers = await db.getStreamerFollowers(streamer.id);
-          console.log(`  Отправка уведомлений для ${followers.length} пользователей`);
-          
-          // Отправляем в личку пользователям
-          for (const follower of followers) {
-            await this.sendNotificationToUser(follower, streamer, newItems);
-          }
-
-          // Отправляем в группы
+          for (const f of followers) await this.sendNotificationToUser(f, streamer, newItems);
           const groups = await db.getGroupsForStreamerNotifications(streamer.id);
-          console.log(`  Отправка в ${groups.length} групп`);
-          for (const group of groups) {
-            await this.sendNotificationToGroup(group, streamer, newItems);
-          }
-          
-          console.log(`  ✓ Уведомления отправлены`);
+          for (const g of groups) await this.sendNotificationToGroup(g, streamer, newItems);
+          console.log(`  ✓ Уведомлено: ${followers.length} польз. + ${groups.length} групп`);
         }
-      } else {
-        console.log(`  ✓ Новых товаров нет`);
       }
 
       await db.saveWishlistItems(streamer.id, currentItems);
-    } catch (error) {
-      console.error(`  ✗ Ошибка при проверке ${streamer.nickname}:`, error.message);
+    } catch (err) {
+      console.error(`  ✗ Ошибка ${streamer.nickname}: ${err.message}`);
     }
   }
 
+  // ─── Уведомления ─────────────────────────────────────────────────────────
+
   async sendNotificationToUser(user, streamer, newItems) {
-    if (!this.bot) { console.log('  ⚠ Бот не настроен'); return; }
-    if (!user.telegram_id) { console.log(`  ⚠ Нет telegram_id у ${user.username}`); return; }
-    
+    if (!this.bot || !user.telegram_id) return;
     try {
-      // Проверяем настройки пользователя
       const settings = await db.getStreamerSettings(user.id, streamer.id);
-      
-      if (!settings.notifications_enabled) {
-        console.log(`  ⊘ Уведомления отключены для @${user.username}`);
-        return;
-      }
-
-      if (!settings.notify_in_pm) {
-        console.log(`  ⊘ ЛС отключены для @${user.username}`);
-        return;
-      }
-
+      if (!settings.notifications_enabled || !settings.notify_in_pm) return;
       await this.bot.sendNewItemsNotification(
-        user.telegram_id,
-        streamer.name || streamer.nickname,
-        streamer.fetta_url,
-        newItems,
-        true // isSenpai = true для личных сообщений
+        user.telegram_id, streamer.name || streamer.nickname,
+        streamer.fetta_url, newItems, true
       );
-      console.log(`  ✓ Уведомление отправлено: @${user.username}`);
-    } catch (error) {
-      console.error(`  ✗ Ошибка уведомления @${user.username}:`, error.message);
+    } catch (err) {
+      console.error(`  ✗ Уведомление @${user.username}: ${err.message}`);
     }
   }
 
   async sendNotificationToGroup(group, streamer, newItems) {
     if (!this.bot) return;
-    
     try {
       await this.bot.sendNewItemsNotification(
-        group.chat_id,
-        streamer.name || streamer.nickname,
-        streamer.fetta_url,
-        newItems,
-        false // isSenpai = false для групп
+        group.chat_id, streamer.name || streamer.nickname,
+        streamer.fetta_url, newItems, false
       );
-      console.log(`  ✓ Уведомление отправлено в группу: ${group.title}`);
-    } catch (error) {
-      console.error(`  ✗ Ошибка уведомления в группу ${group.title}:`, error.message);
+    } catch (err) {
+      console.error(`  ✗ Уведомление группа ${group.title}: ${err.message}`);
     }
   }
 
-  sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+  // ─── Утилиты ──────────────────────────────────────────────────────────────
+
+  isWithinWorkingHours() {
+    const h = new Date().getUTCHours();
+    return h >= 4 || h < 1; // 7:00–3:00 МСК
+  }
+
+  sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   getLastCheckedMap() {
-    const result = {};
-    for (const [id, ts] of this.lastChecked.entries()) {
-      result[id] = ts;
-    }
-    return result;
+    const out = {};
+    for (const [id, ts] of this.lastChecked) out[id] = ts;
+    return out;
+  }
+
+  getQueueStatus() {
+    return {
+      queueLength: this.queue.length,
+      workerBusy: this.workerBusy,
+      queued: this.queue.map(s => ({ id: s.id, nickname: s.nickname, priority: s.priority || 1 }))
+    };
   }
 }
 

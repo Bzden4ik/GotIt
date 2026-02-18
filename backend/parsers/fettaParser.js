@@ -162,7 +162,7 @@ class FettaParser {
       let page = 0;
       let hasMore = true;
       let emptyPagesCount = 0;
-      const maxEmptyPages = 2;
+      const maxEmptyPages = 1;
       let consecutiveErrors = 0;
       const maxErrors = 2; // Уменьшил с 3 до 2 - быстрее останавливаемся при rate limit
 

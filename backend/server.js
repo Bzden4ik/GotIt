@@ -496,8 +496,9 @@ app.get('/api/admin/scheduler/streamers', adminAuth, async (req, res) => {
   try {
     const streamers = await db.getAllStreamersAdmin();
     const lastChecked = schedulerRef ? schedulerRef.getLastCheckedMap() : {};
-    const checkIntervals = schedulerRef ? schedulerRef.checkIntervals : { 3: 30000, 2: 60000, 1: 90000 };
-    res.json({ success: true, streamers, lastChecked, checkIntervals });
+    const checkIntervals = schedulerRef ? schedulerRef.checkIntervals : { 3: 30000, 2: 60000, 1: 60000 };
+    const queueStatus = schedulerRef ? schedulerRef.getQueueStatus() : null;
+    res.json({ success: true, streamers, lastChecked, checkIntervals, queueStatus });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
