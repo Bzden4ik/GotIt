@@ -541,6 +541,32 @@ app.post('/api/admin/broadcast/preview', adminAuth, asyncHandler(async (req, res
   res.json({ success: true, dmVersion: result.dmVersion, groupVersion: result.groupVersion });
 }));
 
+// Тестовая отправка только создателю
+app.post('/api/admin/broadcast/test', adminAuth, asyncHandler(async (req, res) => {
+  const { dmMessage, groupMessage, target } = req.body;
+  if (!dmMessage || !groupMessage) return res.status(400).json({ success: false, error: 'Нет текстов' });
+  if (!BOT_TOKEN) return res.status(500).json({ success: false, error: 'BOT_TOKEN не задан' });
+
+  const CREATOR_TG_ID = parseInt(process.env.CREATOR_TELEGRAM_ID) || 1647163234;
+  const TelegramBot = require('./bot/telegramBot');
+  const bot = new TelegramBot(BOT_TOKEN);
+
+  if (target === 'dm') {
+    await bot.sendMessage(CREATOR_TG_ID, dmMessage, { parse_mode: 'HTML', disable_web_page_preview: true });
+  } else if (target === 'groups') {
+    // Отправляем в группы создателя
+    const creatorUser = await db.getUserByTelegramId(CREATOR_TG_ID);
+    if (creatorUser) {
+      const groups = await db.getUserGroups(creatorUser.id);
+      for (const g of groups) {
+        await bot.sendMessage(g.chat_id, groupMessage, { parse_mode: 'HTML', disable_web_page_preview: true });
+      }
+    }
+  }
+
+  res.json({ success: true });
+}));
+
 // Запуск рассылки
 app.post('/api/admin/broadcast/send', adminAuth, asyncHandler(async (req, res) => {
   const { dmMessage, groupMessage, target } = req.body;
@@ -763,24 +789,25 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 
   <div id="bcPreviewSection" style="display:none">
     <div class="bc-section">
-      <div class="bc-label">💬 Версия для ЛС (с обращением Сэмпай)</div>
-      <div class="bc-preview-box" id="bcDmPreview"></div>
-      <div style="margin-top:6px">
-        <textarea class="bc-textarea" id="bcDmEdit" style="min-height:60px" placeholder="Можно отредактировать..."></textarea>
-      </div>
+      <div class="bc-label">💬 Версия для ЛС (редактируется)</div>
+      <textarea class="bc-textarea" id="bcDmEdit" style="min-height:80px"></textarea>
     </div>
     <div class="bc-section">
-      <div class="bc-label">👥 Версия для групп</div>
-      <div class="bc-preview-box" id="bcGroupPreview"></div>
-      <div style="margin-top:6px">
-        <textarea class="bc-textarea" id="bcGroupEdit" style="min-height:60px" placeholder="Можно отредактировать..."></textarea>
-      </div>
+      <div class="bc-label">👥 Версия для групп (редактируется)</div>
+      <textarea class="bc-textarea" id="bcGroupEdit" style="min-height:80px"></textarea>
     </div>
     <div class="bc-section">
-      <div class="bc-label">Отправить</div>
+      <div class="bc-label">Тест (только вам)</div>
       <div class="bc-row">
-        <button class="bc-btn bc-btn-dm" onclick="bcSend('dm')" id="bcBtnDm">💬 Только в ЛС</button>
-        <button class="bc-btn bc-btn-groups" onclick="bcSend('groups')" id="bcBtnGroups">👥 Только в группы</button>
+        <button class="bc-btn bc-btn-dm" onclick="bcTest('dm')" id="bcBtnTestDm">💬 Только в ЛС (Bzden4ik)</button>
+        <button class="bc-btn bc-btn-groups" onclick="bcTest('groups')" id="bcBtnTestGrp">👥 Только в группы (Bzden4ik)</button>
+      </div>
+    </div>
+    <div class="bc-section">
+      <div class="bc-label">Отправить всем</div>
+      <div class="bc-row">
+        <button class="bc-btn bc-btn-dm" onclick="bcSend('dm')" id="bcBtnDm">💬 Всем в ЛС</button>
+        <button class="bc-btn bc-btn-groups" onclick="bcSend('groups')" id="bcBtnGroups">👥 Всем в группы</button>
         <button class="bc-btn bc-btn-all" onclick="bcSend('all')" id="bcBtnAll">📢 Всем</button>
       </div>
     </div>
@@ -842,8 +869,6 @@ async function bcPreview(){
     const r=await fetch('/api/admin/broadcast/preview?token='+T,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:raw})});
     const d=await r.json();
     if(!d.success){alert('Ошибка: '+d.error);return;}
-    document.getElementById('bcDmPreview').textContent=d.dmVersion;
-    document.getElementById('bcGroupPreview').textContent=d.groupVersion;
     document.getElementById('bcDmEdit').value=d.dmVersion;
     document.getElementById('bcGroupEdit').value=d.groupVersion;
     document.getElementById('bcPreviewSection').style.display='block';
@@ -851,6 +876,19 @@ async function bcPreview(){
     document.getElementById('bcResult').textContent='';
   }catch(e){alert('Ошибка запроса');}
   finally{btn.textContent='✨ Предпросмотр';btn.disabled=false;}
+}
+async function bcTest(target){
+  const dm=document.getElementById('bcDmEdit').value.trim();
+  const grp=document.getElementById('bcGroupEdit').value.trim();
+  if(!dm||!grp){alert('Тексты пустые');return;}
+  const btn=document.getElementById(target==='dm'?'bcBtnTestDm':'bcBtnTestGrp');
+  const orig=btn.textContent;btn.disabled=true;btn.textContent='⏳...';
+  try{
+    const r=await fetch('/api/admin/broadcast/test?token='+T,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dmMessage:dm,groupMessage:grp,target})});
+    const d=await r.json();
+    if(d.success){btn.textContent='✅ Отправлено';setTimeout(()=>{btn.textContent=orig;btn.disabled=false;},2000);}
+    else{alert('Ошибка: '+d.error);btn.textContent=orig;btn.disabled=false;}
+  }catch(e){alert('Ошибка');btn.textContent=orig;btn.disabled=false;}
 }
 async function bcSend(target){
   const dm=document.getElementById('bcDmEdit').value.trim();
