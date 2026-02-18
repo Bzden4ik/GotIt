@@ -35,6 +35,7 @@ class Scheduler {
     this.checkHistory = new Map(); // id -> [duration1, duration2, ...] последние 5
     this.currentStreamer = null;   // { streamer, startedAt } — что проверяется сейчас
     this.planLog = [];             // последние N записей плана для UI
+    this.workerStartedAt = null;   // для watchdog
 
     console.log(`📋 Планировщик ID: ${this.schedulerId}`);
     globalSchedulerInstance = this;
@@ -99,6 +100,14 @@ class Scheduler {
   // ─── Очередь ──────────────────────────────────────────────────────────────
 
   async enqueueDueStreamers() {
+    // Watchdog: если воркер завис дольше 3 минут — принудительный сброс
+    const WORKER_TIMEOUT = 3 * 60 * 1000;
+    if (this.workerBusy && this.workerStartedAt && (Date.now() - this.workerStartedAt) > WORKER_TIMEOUT) {
+      console.warn('⚠ Watchdog: воркер завис >3 мин, принудительный сброс');
+      this.workerBusy = false;
+      this.currentStreamer = null;
+      this.workerStartedAt = null;
+    }
     let streamers;
     try { streamers = await db.getAllTrackedStreamers(); }
     catch (e) { console.error('Ошибка получения стримеров:', e.message); return; }
@@ -207,32 +216,47 @@ class Scheduler {
   async runWorker() {
     if (this.workerBusy) return;
     this.workerBusy = true;
+    this.workerStartedAt = Date.now();
 
-    while (this.queue.length > 0) {
-      const streamer = this.queue.shift();
-      this.queuedIds.delete(streamer.id);
+    try {
+      while (this.queue.length > 0) {
+        const streamer = this.queue.shift();
+        this.queuedIds.delete(streamer.id);
 
-      // Запускаем проверку с замером времени
-      const startTime = Date.now();
-      this.currentStreamer = { streamer, startedAt: startTime };
+        const startTime = Date.now();
+        this.currentStreamer = { streamer, startedAt: startTime };
 
-      await this.checkStreamer(streamer);
+        try {
+          await this.checkStreamer(streamer);
+        } catch (err) {
+          console.error(`  ✗ Необработанная ошибка checkStreamer ${streamer.nickname}: ${err.message}`);
+        }
 
-      const duration = Date.now() - startTime;
-      this.recordDuration(streamer.id, duration);
+        const duration = Date.now() - startTime;
+        this.recordDuration(streamer.id, duration);
+        this.currentStreamer = null;
+
+        console.log(`  ⏱ Время проверки: ${Math.round(duration / 1000)}с`);
+
+        if (this.queue.length === 0) break;
+
+        try {
+          const priority = streamer.priority || 1;
+          const baseDelay = this.baseDelays[priority] || 15000;
+          await this.smartDelay(baseDelay, duration);
+        } catch (err) {
+          console.error(`  ✗ Ошибка в smartDelay: ${err.message}`);
+          await this.sleep(5000); // запасная пауза
+        }
+      }
+    } catch (err) {
+      console.error('✗ Критическая ошибка воркера:', err.message);
+    } finally {
       this.currentStreamer = null;
-
-      console.log(`  ⏱ Время проверки: ${Math.round(duration / 1000)}с`);
-
-      if (this.queue.length === 0) break;
-
-      // Умная пауза
-      const priority = streamer.priority || 1;
-      const baseDelay = this.baseDelays[priority] || 15000;
-      await this.smartDelay(baseDelay, duration);
+      this.workerBusy = false;
+      this.workerStartedAt = null;
+      console.log('✓ Воркер завершил работу');
     }
-
-    this.workerBusy = false;
   }
 
   /**
