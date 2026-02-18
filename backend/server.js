@@ -735,7 +735,7 @@ function switchTab(t){
   document.getElementById('schedPanel').classList.toggle('visible',t==='scheduler');
   document.getElementById('controls').style.display=(t==='scheduler')?'none':'flex';
   if(t==='bot')document.getElementById('botBadge').style.display='none';
-  if(t==='scheduler'){fetchScheduler();return;}
+  if(t==='scheduler'){lastPlanLogKey='';fetchScheduler();return;}
   fetchLogs();
 }
 function setFilter(l){filter=l;document.querySelectorAll('.controls button[id^="btn"]').forEach(b=>b.classList.remove('active'));
@@ -908,16 +908,19 @@ function renderQueue(data){
 }
 
 const PLAN_LOG_ICONS={gap_insert:'💡'};
+let lastPlanLogKey='';
 function renderPlanLog(log){
   const el=document.getElementById('planLogList');
-  if(!log.length){el.innerHTML='<div style="color:#333;font-size:12px;padding:4px 10px">Нет данных</div>';return;}
+  const key=JSON.stringify(log.map(e=>e.ts+e.nickname));
+  if(key===lastPlanLogKey)return; // не перерисовываем если ничего не изменилось
+  lastPlanLogKey=key;
+  if(!log.length){el.innerHTML='<div style="color:#333;font-size:12px;padding:4px 10px">Нет данных — вставки происходят когда VIP/High стример влезает в паузу между Normal</div>';return;}
   el.innerHTML=log.map(e=>{
     const ago=Math.round((Date.now()-e.ts)/1000);
-    const icon=PLAN_LOG_ICONS[e.type]||'•';
     const PNAMES={3:'VIP',2:'High',1:'Normal'};
     return'<div class="plan-log-item gap">'+
-      '<span>'+icon+'</span>'+
-      '<span><b style="color:#ccc">'+esc(e.nickname)+'</b> ['+PNAMES[e.priority]+']</span>'+
+      '<span>💡</span>'+
+      '<span><b style="color:#ccc">'+esc(e.nickname)+'</b> <span style="color:#555">['+PNAMES[e.priority]+']</span></span>'+
       '<span style="color:#555">вставлен в паузу '+fmtMs(e.baseDelay)+'</span>'+
       '<span style="margin-left:auto;color:#444">'+ago+'с назад</span>'+
     '</div>';
