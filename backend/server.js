@@ -856,7 +856,8 @@ async function bcSend(target){
   const dm=document.getElementById('bcDmEdit').value.trim();
   const grp=document.getElementById('bcGroupEdit').value.trim();
   if(!dm||!grp){alert('Тексты пустые');return;}
-  if(!confirm(`Отправить рассылку: ${target === 'dm' ? 'личные сообщения' : target === 'groups' ? 'группы' : 'всем'}?`))return;
+  var tLabel=target==='dm'?'личные сообщения':target==='groups'?'группы':'всем';
+  if(!confirm('Отправить рассылку: '+tLabel+'?'))return;
   ['bcBtnDm','bcBtnGroups','bcBtnAll'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
   const prog=document.getElementById('bcProgress');
   prog.classList.add('visible');
@@ -880,12 +881,12 @@ async function bcPollStatus(){
     const res=d.results;
     const totalSent=(res.dmSent||0)+(res.groupSent||0);
     const totalFailed=(res.dmFailed||0)+(res.groupFailed||0);
-    document.getElementById('bcProgressText').textContent=`Отправлено: ${totalSent} | Ошибок: ${totalFailed}`;
+    document.getElementById('bcProgressText').textContent='Отправлено: '+totalSent+' | Ошибок: '+totalFailed;
     if(d.done){
       clearInterval(bcPollTimer);bcPollTimer=null;bcJobId=null;
       document.getElementById('bcProgressBar').style.width='100%';
       document.getElementById('bcProgressText').textContent='✅ Рассылка завершена';
-      document.getElementById('bcResult').textContent=`ЛС: ${res.dmSent} усп. / ${res.dmFailed} ошиб. | Группы: ${res.groupSent} усп. / ${res.groupFailed} ошиб.`;
+      document.getElementById('bcResult').textContent='ЛС: '+res.dmSent+' усп. / '+res.dmFailed+' ошиб. | Группы: '+res.groupSent+' усп. / '+res.groupFailed+' ошиб.';
       ['bcBtnDm','bcBtnGroups','bcBtnAll'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
     } else {
       document.getElementById('bcProgressBar').style.width=Math.min(90,5+totalSent*3)+'%';
