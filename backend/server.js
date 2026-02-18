@@ -554,66 +554,66 @@ function getAdminPageHtml(token) {
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>GotIt Admin</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',monospace;font-size:13px}
-.header{background:#111118;border-bottom:1px solid #2a2a3a;padding:12px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
-.header h1{font-size:16px;color:#7ee8fa;font-weight:600}
-.tabs{display:flex;gap:4px;margin-left:24px}
-.tab{padding:6px 16px;border-radius:6px;cursor:pointer;background:#1a1a28;border:1px solid #2a2a3a;color:#888;font-size:12px;font-family:inherit;transition:all .2s}
+body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',monospace;font-size:15px}
+.header{background:#111118;border-bottom:1px solid #2a2a3a;padding:14px 24px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:10}
+.header h1{font-size:19px;color:#7ee8fa;font-weight:600}
+.tabs{display:flex;gap:6px;margin-left:28px}
+.tab{padding:8px 20px;border-radius:7px;cursor:pointer;background:#1a1a28;border:1px solid #2a2a3a;color:#888;font-size:14px;font-family:inherit;transition:all .2s}
 .tab:hover{color:#ccc;border-color:#444}
 .tab.active{background:#7ee8fa22;border-color:#7ee8fa;color:#7ee8fa}
-.tab .badge{background:#f87171;color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:4px}
-.status{margin-left:auto;display:flex;gap:12px;font-size:11px;color:#666}
+.tab .badge{background:#f87171;color:#fff;font-size:11px;padding:2px 6px;border-radius:8px;margin-left:5px}
+.status{margin-left:auto;display:flex;gap:16px;font-size:13px;color:#666}
 .status b{color:#7ee8fa}
-.dot{width:8px;height:8px;border-radius:50%;background:#4ade80;display:inline-block;animation:pulse 2s infinite}
+.dot{width:9px;height:9px;border-radius:50%;background:#4ade80;display:inline-block;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.controls{background:#111118;border-bottom:1px solid #2a2a3a;padding:8px 20px;display:flex;gap:8px;flex-wrap:wrap;position:sticky;top:45px;z-index:9}
-.controls button,.controls select,.controls input{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:5px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
+.controls{background:#111118;border-bottom:1px solid #2a2a3a;padding:10px 24px;display:flex;gap:10px;flex-wrap:wrap;position:sticky;top:51px;z-index:9}
+.controls button,.controls select,.controls input{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:7px 14px;border-radius:7px;font-size:13px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
 .controls button:hover{background:#252538;border-color:#7ee8fa;color:#7ee8fa}
 .controls button.active{background:#7ee8fa22;border-color:#7ee8fa;color:#7ee8fa}
-.controls input{width:200px}
+.controls input{width:220px}
 .controls input:focus{border-color:#7ee8fa}
-.log-container{padding:8px 0;overflow-y:auto;height:calc(100vh - 110px)}
-.log-line{padding:2px 20px;display:flex;gap:10px;border-bottom:1px solid #ffffff06;transition:background .15s}
+.log-container{padding:8px 0;overflow-y:auto;height:calc(100vh - 120px)}
+.log-line{padding:4px 24px;display:flex;gap:12px;border-bottom:1px solid #ffffff06;transition:background .15s}
 .log-line:hover{background:#ffffff08}
-.log-time{color:#555;min-width:85px;flex-shrink:0}
-.log-level{min-width:44px;flex-shrink:0;font-weight:600;text-transform:uppercase;font-size:11px}
+.log-time{color:#555;min-width:90px;flex-shrink:0}
+.log-level{min-width:48px;flex-shrink:0;font-weight:600;text-transform:uppercase;font-size:12px}
 .log-level.info{color:#4ade80}.log-level.error{color:#f87171}.log-level.warn{color:#fbbf24}
 .log-msg{white-space:pre-wrap;word-break:break-all;flex:1}
 .log-line.error{background:#f8717108}.log-line.error .log-msg{color:#fca5a5}
-.webhook-info{background:#111118;padding:12px 20px;border-bottom:1px solid #2a2a3a;font-size:12px;display:none}
+.webhook-info{background:#111118;padding:14px 24px;border-bottom:1px solid #2a2a3a;font-size:13px;display:none}
 .webhook-info.visible{display:block}
-.webhook-info span{margin-right:16px}
+.webhook-info span{margin-right:18px}
 .webhook-info .ok{color:#4ade80}.webhook-info .err{color:#f87171}
 .new-log{animation:flashIn .5s ease}
 @keyframes flashIn{from{background:#7ee8fa15}to{background:transparent}}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:3px}
-.sched-panel{display:none;padding:16px 20px;height:calc(100vh - 110px);overflow-y:auto}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}
+.sched-panel{display:none;padding:20px 24px;height:calc(100vh - 120px);overflow-y:auto}
 .sched-panel.visible{display:block}
-.sched-header{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
-.sched-legend{display:flex;gap:10px;margin-left:auto;font-size:11px}
-.sched-legend span{display:flex;align-items:center;gap:4px}
-.dot-vip{width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block}
-.dot-high{width:8px;height:8px;border-radius:50%;background:#60a5fa;display:inline-block}
-.dot-norm{width:8px;height:8px;border-radius:50%;background:#6b7280;display:inline-block}
-.sched-table{width:100%;border-collapse:collapse;font-size:12px}
-.sched-table th{text-align:left;padding:7px 10px;color:#555;border-bottom:1px solid #2a2a3a;font-weight:400;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
-.sched-table td{padding:8px 10px;border-bottom:1px solid #111118;vertical-align:middle}
+.sched-header{display:flex;gap:14px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.sched-legend{display:flex;gap:14px;margin-left:auto;font-size:13px}
+.sched-legend span{display:flex;align-items:center;gap:5px}
+.dot-vip{width:9px;height:9px;border-radius:50%;background:#f59e0b;display:inline-block}
+.dot-high{width:9px;height:9px;border-radius:50%;background:#60a5fa;display:inline-block}
+.dot-norm{width:9px;height:9px;border-radius:50%;background:#6b7280;display:inline-block}
+.sched-table{width:100%;border-collapse:collapse;font-size:14px}
+.sched-table th{text-align:left;padding:9px 12px;color:#555;border-bottom:1px solid #2a2a3a;font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.05em}
+.sched-table td{padding:10px 12px;border-bottom:1px solid #111118;vertical-align:middle}
 .sched-table tr:hover td{background:#ffffff06}
-.p-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.p-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600}
 .p-3{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44}
 .p-2{background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa44}
 .p-1{background:#6b728022;color:#888;border:1px solid #6b728044}
-.prio-select{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:4px 8px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
+.prio-select{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:6px 10px;border-radius:7px;font-size:13px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
 .prio-select:focus,.prio-select:hover{border-color:#7ee8fa;color:#7ee8fa}
-.sched-save{background:#7ee8fa22;border:1px solid #7ee8fa44;color:#7ee8fa;padding:3px 10px;border-radius:6px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .2s}
+.sched-save{background:#7ee8fa22;border:1px solid #7ee8fa44;color:#7ee8fa;padding:5px 13px;border-radius:7px;font-size:13px;font-family:inherit;cursor:pointer;transition:all .2s}
 .sched-save:hover{background:#7ee8fa44}
 .sched-save.saved{background:#4ade8022;border-color:#4ade8044;color:#4ade80}
-.last-check{color:#555;font-size:11px}
+.last-check{color:#555;font-size:13px}
 .last-check.recent{color:#4ade80}
 .last-check.stale{color:#fbbf24}
-.sched-refresh{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:5px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
+.sched-refresh{background:#1a1a28;border:1px solid #2a2a3a;color:#ccc;padding:7px 14px;border-radius:7px;font-size:13px;font-family:inherit;cursor:pointer;outline:none;transition:all .2s}
 .sched-refresh:hover{color:#7ee8fa;border-color:#7ee8fa}
-.interval-info{font-size:11px;color:#555;margin-top:4px}
+.interval-info{font-size:12px;color:#555;margin-top:4px}
 </style></head><body>
 <div class="header">
   <h1>GotIt Admin</h1>
