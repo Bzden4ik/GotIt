@@ -171,6 +171,18 @@ class ApiService {
   }
 
   /**
+   * Проверить статус сайта (технические работы)
+   */
+  async getStatus() {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/status`);
+      return response.data;
+    } catch (error) {
+      return { success: false, maintenance: { active: false } };
+    }
+  }
+
+  /**
    * Проверить авторизован ли пользователь
    */
   isAuthenticated() {

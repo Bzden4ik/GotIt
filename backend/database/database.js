@@ -20,6 +20,14 @@ class DatabaseService {
       console.log('✅ Колонка priority добавлена в streamers');
     } catch (e) { /* уже существует */ }
 
+    try {
+      await this.db.execute(`CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+    } catch(e) { /* уже существует */ }
+
     await this.db.batch([
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -656,6 +664,23 @@ class DatabaseService {
       console.error('Ошибка при захвате лока:', error);
       return false;
     }
+  }
+
+  // ── Настройки сайта ──
+
+  async getSetting(key) {
+    try {
+      const rs = await this.db.execute({ sql: 'SELECT value FROM settings WHERE key = ?', args: [key] });
+      return rs.rows[0]?.value ?? null;
+    } catch(e) { return null; }
+  }
+
+  async setSetting(key, value) {
+    await this.db.execute({
+      sql: `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+      args: [key, String(value)]
+    });
   }
 
   /**

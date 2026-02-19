@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import SearchPage from './pages/SearchPage';
 import TrackedList from './pages/TrackedList';
 import BackgroundGradient from './components/BackgroundGradient';
+import MaintenanceScreen from './components/MaintenanceScreen';
 import apiService from './services/api';
 import './App.css';
 
@@ -25,6 +26,7 @@ const queryClient = new QueryClient({
 function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [maintenance, setMaintenance] = useState(null);
 
   // Восстановление сессии из JWT токена
   useEffect(() => {
@@ -105,12 +107,24 @@ function App() {
     return <div ref={ref} />;
   };
 
+  // Polling статуса техработ каждые 30 секунд
+  useEffect(() => {
+    const checkStatus = async () => {
+      const data = await apiService.getStatus();
+      if (data?.success) setMaintenance(data.maintenance);
+    };
+    checkStatus();
+    const id = setInterval(checkStatus, 30000);
+    return () => clearInterval(id);
+  }, []);
+
   if (authLoading) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
       <Router basename="/GotIt">
         <BackgroundGradient />
+        <MaintenanceScreen maintenance={maintenance} />
         <div className="app">
           <header className="header">
             <div className="container">

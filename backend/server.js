@@ -525,6 +525,33 @@ app.get('/api/admin/scheduler/queue', adminAuth, (req, res) => {
   res.json({ success: true, ...schedulerRef.getQueueStatus() });
 });
 
+// === Public Status ===
+app.get('/api/status', asyncHandler(async (req, res) => {
+  const raw = await db.getSetting('maintenance');
+  const data = raw ? JSON.parse(raw) : { active: false, message: '', endsAt: null };
+  res.json({ success: true, maintenance: data });
+}));
+
+// === Admin Maintenance ===
+app.get('/api/admin/maintenance', adminAuth, asyncHandler(async (req, res) => {
+  const raw = await db.getSetting('maintenance');
+  const data = raw ? JSON.parse(raw) : { active: false, message: '', endsAt: null };
+  res.json({ success: true, maintenance: data });
+}));
+
+app.post('/api/admin/maintenance', adminAuth, asyncHandler(async (req, res) => {
+  const { active, message, endsAt } = req.body;
+  const data = {
+    active: !!active,
+    message: message || '',
+    endsAt: endsAt || null,
+    updatedAt: new Date().toISOString()
+  };
+  await db.setSetting('maintenance', JSON.stringify(data));
+  console.log('⚡ Maintenance:', active ? 'ON' : 'OFF', '|', message);
+  res.json({ success: true, maintenance: data });
+}));
+
 // === Broadcast ===
 const AIAssistant = require('./bot/aiAssistant');
 const broadcastJobs = new Map(); // jobId -> { status, results, done }
@@ -665,6 +692,20 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 @keyframes flashIn{from{background:#7ee8fa15}to{background:transparent}}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:4px}
 .broadcast-panel{display:none;padding:24px;height:calc(100vh - 120px);overflow-y:auto;max-width:900px;margin:0 auto}
+.bc-maint{background:#111118;border:1px solid #2a2a3a;border-radius:12px;padding:20px;margin-bottom:28px}
+.bc-maint.active{border-color:rgba(251,113,133,0.35);background:rgba(251,113,133,0.04)}
+.bc-maint-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.bc-maint-title{font-size:14px;font-weight:600;color:#7ee8fa;display:flex;align-items:center;gap:8px}
+.bc-maint-badge{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.04em}
+.bc-maint-badge.on{background:rgba(251,113,133,0.15);color:#fb7185;border:1px solid rgba(251,113,133,0.3)}
+.bc-maint-badge.off{background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)}
+.bc-maint-toggle{display:flex;align-items:center;gap:8px}
+.bc-toggle-track{width:44px;height:24px;border-radius:12px;background:#1a1a28;border:1px solid #2a2a3a;position:relative;cursor:pointer;transition:all .3s var(--ease,ease)}
+.bc-toggle-track.on{background:rgba(251,113,133,0.25);border-color:rgba(251,113,133,0.5)}
+.bc-toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#444;transition:all .3s var(--ease,ease)}
+.bc-toggle-track.on .bc-toggle-thumb{left:23px;background:#fb7185}
+.bc-divider{height:1px;background:#1a1a28;margin:24px 0}
+.bc-maint-preview-label{font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .broadcast-panel.visible{display:block}
 .bc-title{font-size:15px;color:#7ee8fa;font-weight:600;margin-bottom:18px}
 .bc-label{font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
@@ -779,6 +820,35 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:'JetBrains Mono','Consolas',mo
 </div>
 <div class="log-container" id="logContainer"></div>
 <div class="broadcast-panel" id="broadcastPanel">
+
+  <div class="bc-maint" id="maintBlock">
+    <div class="bc-maint-head">
+      <div class="bc-maint-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Технические работы
+        <span class="bc-maint-badge off" id="maintBadge">ВЫКЛЮЧЕНО</span>
+      </div>
+      <div class="bc-maint-toggle">
+        <div class="bc-toggle-track" id="maintToggle" onclick="maintToggle()">
+          <div class="bc-toggle-thumb"></div>
+        </div>
+      </div>
+    </div>
+    <div class="bc-label">Сообщение пользователям</div>
+    <textarea class="bc-textarea" id="maintMsg" style="min-height:60px" placeholder="Например: Обновляем серверы. Скоро всё вернётся!"></textarea>
+    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <div style="flex:1;min-width:200px">
+        <div class="bc-label" style="margin-bottom:6px">Окончание (необязательно)</div>
+        <input type="datetime-local" id="maintEndsAt" class="bc-textarea" style="min-height:0;padding:9px 12px;cursor:pointer">
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:1px">
+        <button class="bc-btn bc-btn-preview" id="maintSaveBtn" onclick="maintSave()">&#x2713; Сохранить</button>
+        <button class="bc-btn" style="background:#1a1a28;border-color:#2a2a3a;color:#555" onclick="maintClearEnds()">&#x2715; Сбросить время</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bc-divider"></div>
   <div class="bc-title">📢 Рассылка от создателя</div>
 
   <div class="bc-label">Сообщение от создателя (сырой текст)</div>
@@ -931,6 +1001,59 @@ async function bcPollStatus(){
     }
   }catch(e){}
 }
+// === Maintenance ===
+let maintActive=false;
+async function maintLoad(){
+  try{
+    const r=await fetch('/api/admin/maintenance?token='+T);
+    const d=await r.json();
+    if(d.success)maintApply(d.maintenance);
+  }catch(e){}
+}
+function maintApply(m){
+  maintActive=!!m.active;
+  const block=document.getElementById('maintBlock');
+  const badge=document.getElementById('maintBadge');
+  const tog=document.getElementById('maintToggle');
+  if(maintActive){
+    block.classList.add('active');badge.className='bc-maint-badge on';badge.textContent='ВКЛЮЧЕНО';
+    tog.classList.add('on');
+  } else {
+    block.classList.remove('active');badge.className='bc-maint-badge off';badge.textContent='ВЫКЛЮЧЕНО';
+    tog.classList.remove('on');
+  }
+  document.getElementById('maintMsg').value=m.message||'';
+  if(m.endsAt){
+    const d=new Date(m.endsAt);
+    const pad=n=>String(n).padStart(2,'0');
+    document.getElementById('maintEndsAt').value=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  } else {
+    document.getElementById('maintEndsAt').value='';
+  }
+}
+function maintToggle(){
+  maintActive=!maintActive;
+  maintApply({active:maintActive,message:document.getElementById('maintMsg').value,endsAt:document.getElementById('maintEndsAt').value||null});
+}
+async function maintSave(){
+  const btn=document.getElementById('maintSaveBtn');
+  btn.disabled=true;btn.textContent='⏳ ...';
+  const endsAtVal=document.getElementById('maintEndsAt').value;
+  try{
+    const r=await fetch('/api/admin/maintenance?token='+T,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({active:maintActive,message:document.getElementById('maintMsg').value,endsAt:endsAtVal||null})
+    });
+    const d=await r.json();
+    if(d.success){
+      maintApply(d.maintenance);
+      btn.textContent='✅ Сохранено';
+      setTimeout(()=>{btn.textContent='\u2713 Сохранить';btn.disabled=false;},1500);
+    } else {alert('Ошибка: '+d.error);btn.textContent='\u2713 Сохранить';btn.disabled=false;}
+  }catch(e){alert('Ошибка');btn.textContent='\u2713 Сохранить';btn.disabled=false;}
+}
+function maintClearEnds(){document.getElementById('maintEndsAt').value='';}
+
 let schedData={streamers:[],lastChecked:{},checkIntervals:{3:30000,2:60000,1:90000}};
 
 function switchTab(t){
@@ -945,7 +1068,7 @@ function switchTab(t){
   document.getElementById('broadcastPanel').classList.toggle('visible',t==='broadcast');
   if(t==='bot')document.getElementById('botBadge').style.display='none';
   if(t==='scheduler'){lastPlanLogKey='';fetchScheduler();return;}
-  if(t==='broadcast')return;
+  if(t==='broadcast'){maintLoad();return;}
   fetchLogs();
 }
 function setFilter(l){filter=l;document.querySelectorAll('.controls button[id^="btn"]').forEach(b=>b.classList.remove('active'));
