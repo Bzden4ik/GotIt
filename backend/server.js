@@ -525,6 +525,20 @@ app.get('/api/admin/scheduler/queue', adminAuth, (req, res) => {
   res.json({ success: true, ...schedulerRef.getQueueStatus() });
 });
 
+// === Maintenance middleware ===
+app.use('/api', async (req, res, next) => {
+  // Публичные эндпойнты пропускаем всегда
+  if (req.path === '/status' || req.path.startsWith('/admin') || req.path.startsWith('/auth')) return next();
+  try {
+    const raw = await db.getSetting('maintenance');
+    const data = raw ? JSON.parse(raw) : { active: false };
+    if (data.active) {
+      return res.status(503).json({ success: false, error: 'maintenance', message: data.message || 'Технические работы' });
+    }
+  } catch(e) { /* не блокируем при ошибке БД */ }
+  next();
+});
+
 // === Public Status ===
 app.get('/api/status', asyncHandler(async (req, res) => {
   const raw = await db.getSetting('maintenance');

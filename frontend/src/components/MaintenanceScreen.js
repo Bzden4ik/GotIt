@@ -76,6 +76,8 @@ function TerminalLines({ visible }) {
 
 function MaintenanceScreen({ maintenance }) {
   const [visible, setVisible] = useState(false);
+  const overlayRef = useRef(null);
+  const observerRef = useRef(null);
 
   useEffect(() => {
     if (maintenance?.active) {
@@ -86,13 +88,51 @@ function MaintenanceScreen({ maintenance }) {
     }
   }, [maintenance?.active]);
 
+  // MutationObserver: если элемент удалили или сняли класс visible — восстанавливаем
+  useEffect(() => {
+    if (!visible || !overlayRef.current) return;
+
+    const el = overlayRef.current;
+
+    observerRef.current = new MutationObserver(() => {
+      // Если класс visible убрали — возвращаем
+      if (!el.classList.contains('visible')) {
+        el.classList.add('visible');
+      }
+    });
+
+    // Следим за атрибутами самого элемента
+    observerRef.current.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+
+    // Следим за удалением из родителя
+    const parentObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        m.removedNodes.forEach(node => {
+          if (node === el) {
+            // Восстанавливаем элемент
+            m.target.appendChild(el);
+          }
+        });
+      }
+    });
+
+    if (el.parentNode) {
+      parentObserver.observe(el.parentNode, { childList: true });
+    }
+
+    return () => {
+      observerRef.current?.disconnect();
+      parentObserver.disconnect();
+    };
+  }, [visible]);
+
   if (!maintenance?.active && !visible) return null;
 
   const msg = maintenance?.message || 'Совсем скоро всё вернётся в норму!';
   const endsAt = maintenance?.endsAt;
 
   return (
-    <div className={`maint-overlay${visible ? ' visible' : ''}`}>
+    <div ref={overlayRef} className={`maint-overlay${visible ? ' visible' : ''}`}>
       <div className="maint-bg">
         <div className="maint-ribbon maint-ribbon--1" />
         <div className="maint-ribbon maint-ribbon--2" />
