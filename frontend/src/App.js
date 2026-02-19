@@ -120,25 +120,18 @@ function App() {
     return () => clearInterval(id);
   }, []);
 
-  if (authLoading) return null;
-
-  // Редирект на страницу техработ если они активны
-  if (maintenance?.active && typeof window !== 'undefined') {
+  // Редирект при изменении статуса техработ
+  useEffect(() => {
+    if (maintenance === null) return; // ещё не загрузился
     const currentPath = window.location.pathname.replace('/GotIt', '') || '/';
-    if (currentPath !== MAINTENANCE_PATH) {
+    if (maintenance.active && currentPath !== MAINTENANCE_PATH) {
       window.location.replace('/GotIt' + MAINTENANCE_PATH);
-      return null;
-    }
-  }
-
-  // Если на странице техработ, но они выключены — на главную
-  if (!maintenance?.active && typeof window !== 'undefined') {
-    const currentPath = window.location.pathname.replace('/GotIt', '') || '/';
-    if (currentPath === MAINTENANCE_PATH) {
+    } else if (!maintenance.active && currentPath === MAINTENANCE_PATH) {
       window.location.replace('/GotIt/');
-      return null;
     }
-  }
+  }, [maintenance]);
+
+  if (authLoading) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
