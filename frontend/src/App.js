@@ -9,6 +9,8 @@ import MaintenanceScreen from './components/MaintenanceScreen';
 import apiService from './services/api';
 import './App.css';
 
+const MAINTENANCE_PATH = '/maintenance';
+
 const BOT_USERNAME = process.env.REACT_APP_TELEGRAM_BOT_USERNAME || '';
 
 // React Query Client
@@ -120,11 +122,28 @@ function App() {
 
   if (authLoading) return null;
 
+  // Редирект на страницу техработ если они активны
+  if (maintenance?.active && typeof window !== 'undefined') {
+    const currentPath = window.location.pathname.replace('/GotIt', '') || '/';
+    if (currentPath !== MAINTENANCE_PATH) {
+      window.location.replace('/GotIt' + MAINTENANCE_PATH);
+      return null;
+    }
+  }
+
+  // Если на странице техработ, но они выключены — на главную
+  if (!maintenance?.active && typeof window !== 'undefined') {
+    const currentPath = window.location.pathname.replace('/GotIt', '') || '/';
+    if (currentPath === MAINTENANCE_PATH) {
+      window.location.replace('/GotIt/');
+      return null;
+    }
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router basename="/GotIt">
         <BackgroundGradient />
-        <MaintenanceScreen maintenance={maintenance} />
         <div className="app">
           <header className="header">
             <div className="container">
@@ -158,6 +177,7 @@ function App() {
             <Routes>
               <Route path="/" element={<SearchPage user={user} />} />
               <Route path="/tracked" element={<TrackedList user={user} />} />
+              <Route path="/maintenance" element={<MaintenanceScreen maintenance={maintenance} asPage />} />
             </Routes>
           </main>
         </div>
