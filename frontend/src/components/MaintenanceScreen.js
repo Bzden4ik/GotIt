@@ -49,13 +49,14 @@ function TerminalLines({ visible }) {
   useEffect(() => {
     if (!visible) { setShown([]); setDone([]); return; }
 
+    const timers = timerRef.current;
     TERM_LINES.forEach((_, i) => {
       const t1 = setTimeout(() => setShown(p => [...p, i]), 800 + i * 600);
       const t2 = setTimeout(() => setDone(p => [...p, i]), 800 + i * 600 + 900);
-      timerRef.current.push(t1, t2);
+      timers.push(t1, t2);
     });
 
-    return () => timerRef.current.forEach(clearTimeout);
+    return () => timers.forEach(clearTimeout);
   }, [visible]);
 
   return (
